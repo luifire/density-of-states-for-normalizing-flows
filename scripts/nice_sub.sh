@@ -1,0 +1,1 @@
+qsub -cwd -N "NICE" -l cuda=1 -l h_vmem=5G -l mem_free=5G -binding linear:2 -l gputype=P100G12 train_nice.sh

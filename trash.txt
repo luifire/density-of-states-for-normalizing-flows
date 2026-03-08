@@ -1,0 +1,2477 @@
+#from matplotlib import rc
+#rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
+#rc('text', usetex=True)
+
+
+#####
+
+
+def draw_random_samples_with_factor_and_plot():
+    raise Exception("Unused?")
+    """This does something like for f in factors plot(sample(f * z)), z~N(0,1) """
+    factors = [0.25, 0.5, 0.75, 0.8, 0.9, 1, 1.1, 1.2, 1.4, 1.5]
+    random_samples = 5
+    fig, axs = plt.subplots(random_samples, len(factors), figsize=(20, 8))
+
+    for y in range(random_samples):
+        set_seeds(y)
+        init_random = torch.normal(0, 1, size=EasyAccess().latent_shape)
+
+        for x, f in enumerate(factors):
+            set_seeds(EasyAccess().args.seed)
+            z = f * init_random
+            image = sample_from_z(EasyAccess().model, z)
+
+            show_tensor_image(image[0], axs[y, x])
+            if y == 0:
+                axs[y, x].set_title(f'{f:.2f}')
+
+    print('-> Factor of z')
+
+
+#########
+
+
+def sample_images_on_unit_circle_and_plot(cleaning_resolution):
+    raise Exception('Used?')
+    """This samples images from z=(a,...,a) and plots it
+     (I know, this is not a unit circle)"""
+    config = EasyAccess().args
+    latent_shape = EasyAccess().latent_shape
+    model = EasyAccess().model
+    loss_fn = EasyAccess().loss_fn
+
+    small = np.arange(0, .5, 0.025)
+    big = np.arange(.5, 2, 0.2)
+    factors = np.concatenate([small, big]).flatten()
+
+    cols = 7
+    fig, axs = plt.subplots(len(factors) // cols, cols, figsize=(12, 8))
+    axs = axs.reshape(-1)
+    for i, f in enumerate(factors):
+        set_seeds(config.seed)  # there is a lot of sampling going on for SurVAE - thus we reset this for each image
+        # draw samples
+        z = f * torch.ones(latent_shape)
+        img = sample_from_z(model, z)
+
+        # cleaning
+        img = digitize_image_values(img, cleaning_resolution)
+        # produce likelihood
+        log_prob = loss_fn.lln_detached(img).item()
+
+        show_tensor_image(img[0], axs[i])
+        axs[i].set_title(f'{f:.2f} p={log_prob:.3f}')
+
+
+
+############
+
+
+def draw_random_samples(sample_count):
+    raise Exception('Used?')
+    """This calls the cample function of the model and plots the samples"""
+    model = EasyAccess().model
+    samples = model.sample(sample_count).detach().cpu().float()
+    return samples
+
+
+###############
+
+
+def compute_loss_and_show(data, label, color=None):
+    raise Exception("Unused?")
+    """computes the loss and prints a vline"""
+    data = data.unsqueeze(0)
+    lln = EasyAccess().loss_fn.lln_detached(data)
+    vline(lln, label, color)
+
+
+#########
+
+
+
+if False:
+    plt.figure(figsize=(10,5))
+    training_loss = all_losses[MAIN_TRAIN_CLS]
+
+    Z = training_loss[Z_IDX]
+    #Z = Z.reshape((Z.shape[0], -1))
+    mu_Z = Z.mean(axis=0)
+    
+    cov_Z = np.cov(Z-mu_Z, rowvar=False)
+    sns.heatmap(np.log(np.abs(cov_Z)), cmap='viridis')
+    cov_inv_Z = np.linalg.inv(cov_Z)
+
+    print(cov_Z[0].sum())
+    print(Z.mean())
+    print(np.diag(cov_Z).mean())
+	
+	
+if False:
+    sns.heatmap(cov_inv_Z, cmap='viridis')
+	
+	
+#############
+
+    def resume(self):
+        resume_path = os.path.join(self.log_base, self.data_id, self.model_id, self.optim_id, self.args.resume, 'check')
+        print(resume_path)
+        print('wrong resume path')
+        exit(1)
+        self.checkpoint_load(resume_path)
+        for epoch in range(self.current_epoch):
+            train_dict = {}
+            for metric_name, metric_values in self.train_metrics.items():
+                train_dict[metric_name] = metric_values[epoch]
+            if epoch in self.eval_epochs:
+                eval_dict = {}
+                for metric_name, metric_values in self.eval_metrics.items():
+                    eval_dict[metric_name] = metric_values[self.eval_epochs.index(epoch)]
+            else:
+                eval_dict = None
+            self.log_fn(epoch, train_dict=train_dict, eval_dict=eval_dict)
+
+##############
+epsilon = torch.finfo(torch.float32).eps
+        total_param_count = sum([p.numel() for p in self.model.parameters()])
+        
+		sqrt_0_1 = np.sqrt(0.1)
+        
+		
+            if False and self.args.model == 'alex':
+                # David experimental
+                inverse_weight_decay = torch.tensor(.0).to('cuda')
+                for param in self.model.parameters():
+                    percentage_of_total_parameters = param.numel() / total_param_count
+                    inverse_weight_decay += (1/(param*sqrt_0_1 + epsilon)**2).sum() * percentage_of_total_parameters
+
+                make_it_small = 2
+                weight_prob = 0.99999
+
+                inverse_weight_decay /= (inverse_weight_decay.detach() + epsilon).abs().log().floor().exp()
+                loss /= (loss.detach() + epsilon).abs().log().floor().exp()
+
+                loss = weight_prob * loss + (1-weight_prob) * inverse_weight_decay
+                loss = make_it_small * loss
+				
+				
+##############
+
+We now want to print the expected log likelihood histogram. Thus we need to find out its distribution.<br>
+Here we handwavy show, that $\prod_i^d x_i \sim N(0, \frac{1}{d})$ for $x_i \sim N(0,1)$.<br>
+Our prior distribution over the latent vector $z := \text{model}(x)$ is a multivariate Gaussian of the form $N_d(0,1)$.<br>
+As all $z_i$ are assumed to be i.i.d. we can write them as $\prod_i^d p_i(z_i)$ with $p_i(z_i) \sim N(0,1)$.<br><br>
+When $x \sim N(0,\sigma_1^2)$ and $ y \sim N(0,\sigma_2^2)$ then $xy \sim N(0, \frac{ \sigma_1^2 \sigma_2^2 }{\sigma_1^2 + \sigma_2^2})$. <br>
+(See https://ccrma.stanford.edu/~jos/sasp/Product_Two_Gaussian_PDFs.html ) <br>
+If $\sigma_1^2 = \sigma_2^2 = 1$ then $xy \sim N(0, \frac{1}{2})$.<br>
+Now for any $a_i \sim (0, \frac{1}{d})$ and $x \sim N(0,1)$ it can be seen that $a_i x \sim (0, \frac{1}{i+1})$.<br>
+Thus $\prod_i^d p_i(z_i) \sim N(0, \frac{1}{d})$.<br>
+
+
+This indicates that was has been learned is still far off from the expected distribution.<br>
+I added a one dimensional normal for scale. <br>
+What is weird is how much better it fits our predictions. <br>
+This finding is very troubeling for me. If I misunderstand something here please let me know!
+But I do get it right that (for "simplicity" assuming we have a normalizing flow) if we would have found the perfect diffeomorphism from our prior to our original space (0's of MNIST) the curve of the 0s should look like the 'Expected' curve? 
+
+
+
+##############
+
+def _plot_bad_lln(interesting_losses, top_images, bottom_images, artificial_images):
+    raise Exception('Used?')
+    """I tried to create a couple of bad images"""
+    print_class_averages(interesting_losses)
+
+    bottom_top_images = bottom_images.copy()
+    bottom_top_images.update(top_images)
+
+    sorted_losses = sorted(bottom_top_images)
+    vline(sorted_losses[-1], 'best sample')
+    vline(sorted_losses[0], 'worst sample')
+
+    for name, loss in artificial_images:
+        color = 'k' if name == 'black' else None
+        vline(loss, name, color=color)
+
+    _ = plt.legend(fontsize=LEGEND_FONT_SIZE)
+	
+	
+##############
+
+def plot_good_lln(interesting_losses, top_images, artificial_images):
+    raise Exception('Used?')
+    print_class_averages(interesting_losses)
+
+    sorted_losses = sorted(top_images)
+    vline(sorted_losses[-1], 'best sample')
+
+    for name, loss in artificial_images:
+        color = 'k' if name == 'black' else None
+        vline(loss, name, color=color)
+
+    _ = plt.legend(fontsize=LEGEND_FONT_SIZE)
+
+#################
+
+
+    def x_to_z(self, x):
+        raise Exception('Is this used?')
+        """Computes z and the volume changing factor"""
+        self.model.eval()
+        with torch.no_grad():
+            if self.model_name == 'survae':
+                raise NotImplementedError()
+            elif self.model_name == 'nf':
+                z = self.model(x)
+                volume = self.model.logdet()
+        return z, volume
+		
+#####################
+
+    def lln_without_volume(self, x):
+        """Computes p(f^-1(x)) without * |det(Jacobian)|"""
+        raise Exception('used?')
+        self.model.eval()
+        with torch.no_grad():
+            if self.model_name == 'survae':
+                raise NotImplementedError()
+            elif self.model_name == 'nf':
+                return -self.nf_loss(self.model, x, preserve_volume=False)
+
+
+\begin{align}
+&\nt(\Ex \left[ \frac{1}{\Vt} \right]^{-1} \pZ(\ft))\\
+&=\left\{\nt\Ex \left[ \frac{1}{\Vt} \right]^{-1} \right\} \pZ(\ft) + \alpha \nt \pZ(\ft)\\
+&=\left\{-\alpha^{-2} * \Ex \left[ \nt\frac{1}{\Vt} \right] \right\} \pZ(\ft) + \alpha \nt \pZ(\ft)\\
+&=\left\{-\alpha^{-2} * \Ex \left[ -(\Vt)^{-2} \nt \Vt \right] \right\} \pZ(\ft) + \alpha \nt \pZ(\ft)
+\end{align}
+
+
+&=\Ex \left[ \frac{1}{\Vt} \right] \nt \Ex \left[  \frac{1}{\Vt} \right]^{-1} + \frac{\nt\pZ(\ft)}{\pZ(\ft)} \\
+&=\Ex \left[ \frac{1}{\Vt} \right] 
+	\left( -\Ex \left[  \frac{1}{\Vt} \right]^{-2} \Ex 
+		\left[  \nt \frac{1}{\Vt} \right]\right) 
++ \frac{\nt\pZ(\ft)}{\pZ(\ft)} \\
+&= -\Ex \left[  \frac{1}{\Vt} \right]^{-1} \Ex 
+	\left[  \nt \frac{1}{\Vt} \right] 
+	+ \frac{\nt\pZ(\ft)}{\pZ(\ft)} \\
+	
+	
+	
+"""
+        self.features = nn.Sequential(
+            nn.Conv2d(1, 32, kernel_size=11, stride=4, padding=2),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3),
+            nn.Conv2d(32, 64, kernel_size=5, padding=2),
+            nn.ReLU(inplace=True),
+            #nn.MaxPool2d(kernel_size=3),#, stride=2),
+            nn.Conv2d(64, 192, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(192, 256, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(256, 256, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            #nn.MaxPool2d(kernel_size=3, stride=2),
+        )
+        self.avgpool = nn.AdaptiveAvgPool2d((6, 6))
+        self.classifier = nn.Sequential(
+            #nn.Dropout(),
+            nn.Linear(256 * 6 * 6, 4096),
+            nn.ReLU(inplace=True),
+            #nn.Dropout(),
+            nn.Linear(4096, 4096),
+            #nn.ReLU(inplace=True),
+            nn.Linear(4096, self.latent_dim),
+        )
+        """
+		
+		
+		
+    """
+    z_idcs = np.argsort(z_log_prob)
+    lln_idcs = np.argsort(all_lln)
+    
+    n_element = len(z_log_prob)
+    #print('none unique z_log_prob:', n_element - len(np.unique(z_log_prob)), ' none unique lln', n_element - len(np.unique(all_lln)))
+    print('Matching Indices: ', np.sum(z_idcs == lln_idcs), '/', n_element)
+    
+    a = (z_idcs == lln_idcs)
+    
+    if not np.any(a == False):
+        return
+    
+    for i in range(1):
+        first_wrong_idx_idx = np.where(a == False)[0][i]
+
+        # this is weirdly sorted due to np.unique
+        print('z_idcs', z_idcs[first_wrong_idx_idx-1], z_idcs[first_wrong_idx_idx], z_idcs[first_wrong_idx_idx+1])
+        print('lln_idcs', lln_idcs[first_wrong_idx_idx-1], lln_idcs[first_wrong_idx_idx], lln_idcs[first_wrong_idx_idx+1])
+
+        print('z_log_prob', z_log_prob[z_idcs[first_wrong_idx_idx-1]], z_log_prob[z_idcs[first_wrong_idx_idx]], z_log_prob[z_idcs[first_wrong_idx_idx+1]])
+        print('all_lln', all_lln[lln_idcs[first_wrong_idx_idx-1]], all_lln[lln_idcs[first_wrong_idx_idx]], all_lln[lln_idcs[first_wrong_idx_idx+1]])
+        print('z_log_prob[3191]', z_log_prob[3191])
+    
+    print()
+    """
+	
+	
+	Another important note is, that current literature exclusively uses less complex data as outliers  compared to the inlier/training data .
+Some outliers obtain lesser likelihood on average (e.g. digit "8") and by human judgement an "8" is more complex than a "0".
+Thus, to make our results comparable to other literature, we should start to compare high complex to low complex data sets (e.g. FashionMNIST to MNIST).
+
+We could use the cdf of the prior $\mathcal{N}(0,1)$, however as $\ft(\X) \sim G^D \not \sim \Normal$ (otherwise we wouldn't need the volume changing term) it makes more sense to use the cdf of whatever $G$ is, which can be approximated using the empirical cdf.
+As our samples from the training set are also i.i.d. we obtain a large amount or samples for $G^1$ like $\{\ft(\x_1)_0, ...,  \ft(\x_1)_D, ..., \ft(\x_N)_0, ...,  \ft(\x_N)_D\}$, where $\x_i$ comes from the training data set. 
+
+
+    def create_samples_and_add_to_batch(self, batch):
+        # samples from the trained model and attatches the samples to the batch
+        self.model.sample(self.args.loss_sample_count, manipulate_samples=False)
+
+            new_batch = torch.cat((samples, batch))
+        return new_batch
+		
+		
+############
+
+\subsection*{Remark / Idea}
+Note: this inside/idea is potentially wrong, but I can't figure out why.
+If you don't want to think about this, you can skip it.\\
+
+Lets assume our data was generated from some low d-dimensional manifold M embedded in a high D-dimensional space S.
+As we don't know the manifold we approximate the distribution of our data with D-dimensional distribution $p_S$ (note that there is no data space at the moment).
+Because the manifold doesn't occupy any volume in S, for $\int_{S} p_S(\s) d\s$ to be $1$, $p_S(\s)$
+needs to be a Dirac distribution when $\s \in M$.
+As Dirac distributions are numerically unfeasible, consider an "almost" Dirac distribution (e.g. $\mathcal{N}(0, 10^{-20})$).
+For a NF with shape $p_x(x) := p_Z(f(x)) V(x)$, where $p_Z$ is a Gaussian prior, $f$ is the mapping into latent space and $V$ is the Jacobian of $f$ at position $x$, $p_Z(f(x))$ can not account for the Dirac distribution, but $V(x)$ could.
+
+Consider $x \in M$, $\tilde{x} := x + \Delta x$ "almost" not in $M$ and $\hat{x} := x + \epsilon \not \in M$.
+%$p_X(\tilde{x})$
+
+$f$ would have to bring $x$ as close to the center as possible and $\hat{x}$ as far away from the center as possible.
+Lets consider the edge cases (I omit all limes)
+\[
+f(y)= 
+\begin{cases}
+0 \cdot y,& y\in M\\
+a \cdot y,& y \text{ almost not in M}\\
+\infty \cdot y,& y \not \in M
+\end{cases}
+\]
+So $V(x) = $
+
+\begin{figure}[h]
+	\centering
+	\includegraphics[scale=1]{scatch.png}
+	\caption{Aaaaaaaaaaaa.}
+\end{figure}
+
+###########
+
+
+--model nf --root C:\Mega\trunk\master-thesis\data --flow=RealNVP --dataset=mnist --epochs=81 --eval_every 1 --lr=5e-5 --prior=Gaussian --num_blocks=3 --batch_size=32 --num_workers=0 --old_use_case --loss_sample_count 32 --training_class 0
+--model survae --epochs 100 --batch_size 32 --optimizer adamax --lr 1e-3 --gamma 0.995 --eval_every 10 --warmup 5000 --num_steps 2 --num_scales 2 --dequant flow --pooling max --dataset mnist --root C:\Mega\trunk\master-thesis\data --num_workers 0 --training_class 0 --debug --new_loss
+
+nf_new_loss_2_exp:
+--model nf --root C:\Mega\trunk\master-thesis\data --flow=RealNVP --dataset=mnist --epochs=81 --eval_every 1 --lr=5e-5 --prior=Gaussian --num_blocks=3 --batch_size=32 --num_workers=0 --old_use_case --new_loss_2 --loss_sample_count 32 --training_class 0  --load_checkpoint nf\RealNVP_blocks-3_mnist_cls-0\08.24_19-13-38
+
+nice:
+--model nf --root C:\Mega\trunk\master-thesis\data --flow=NICE --dataset=mnist --epochs=81 --eval_every 1 --lr=5e-5 --prior=Gaussian --num_blocks=3 --batch_size=32 --num_workers=0 --training_class 0 --old_use_case --debug
+
+iwae:
+--model iwae --root C:\Mega\trunk\master-thesis\data --dataset=mnist --epochs=81 --eval_every 10 --lr=5e-6 --batch_size=32 --num_workers=0 --training_class 0 --latent_dim 30 --debug --depth=6
+
+demun:
+--model demun --root C:\Mega\trunk\master-thesis\data --dataset=mnist --epochs=81 --eval_every 20 --lr=5e-5 --batch_size=32 --num_workers=0 --training_class 0 --debug --sample_every 1 --num_k=16 --latent_dim=9
+
+conv:
+--model conv --root C:\Mega\trunk\master-thesis\data --dataset=mnist --epochs=81 --eval_every 5 --lr=5e-6 --batch_size=32 --num_workers=0 --training_class 0 --num_t=11 --latent_dim=30 --no_bias --old_use_case
+
+survae_hierachy
+--model survae --epochs 100 --batch_size 2 --optimizer adamax --lr 1e-3 --gamma 0.995 --eval_every 10 --check_every 1 --warmup 5000 --num_steps 2 --num_scales 5 --dequant flow --pooling max --dataset mnist --root C:\Mega\trunk\master-thesis\data --augmentation eta --num_workers 0 --training_class 0 --debug
+
+
+----------------
+
+
+def compute_kl_via_ecdf(p_data, q_data):
+    # http://www.tsc.uc3m.es/~fernando/bare_conf3.pdf
+    dx = np.diff(np.sort(np.unique(p_data)))
+    dy = np.diff(np.sort(np.unique(q_data)))
+    ex, ey = min(dx), min(dy)
+    e = min(ex, ey) / 2
+    P = ECDF(p_data)
+    Q = ECDF(q_data)
+    
+    x = p_data
+    KL = np.mean( np.log( (P(x)-P(x-e))) - np.log( (Q(x)-Q(x-e)) ))
+    return KL
+    #print(P)
+    #print(dx)
+    """dx  <-  diff(sort(unique(x)))
+    dy  <-  diff(sort(unique(y)))
+    ex  <-  min(dx) ; ey  <-  min(dy)
+    e   <-  min(ex, ey)/2
+    n   <-  length(x)    
+    P  <-   my.ecdf(x) ; Q  <-  my.ecdf(y)
+    KL  <-  sum( log( (P(x)-P(x-e))/(Q(x)-Q(x-e)))) / n
+    KL """             
+    
+def compute_discrete_kl_div(p_data, q_data, bins=50):
+    #kl_div = np.sum(np.exp(p_data) * (p_data - q_data))
+    kl_div = np.mean((p_data - q_data))
+    print(kl_div)
+    return kl_div
+
+    def probabilities(data):
+        pdfs, edges = np.histogram(data, bins=bins, density=True)
+        return pdfs * np.diff(edges)
+        
+    print(p_data.min())
+    print(q_data.min())
+    print(p_data.dtype)
+    
+    #p = probabilities(p_data)
+    p_pdfs, p_edges = np.histogram(p_data, bins=bins, density=True)
+    p = p_pdfs * np.diff(p_edges)
+    #print(pdfs, edges)
+    #print(len(edges))
+    #print()
+    
+    q_pdfs, q_edges = np.histogram(q_data, bins=p_edges, density=True)
+    q = q_pdfs * np.diff(q_edges)
+    
+    #q = probabilities(q_data)
+    #print(np.sum(p))
+    print(p)
+    print(q)
+    #print(np.array(p_bins).sum(1))
+    
+    p/q
+    
+--------
+
+#from divergence import relative_entropy_from_samples
+
+
+def compute_probs(data, n=10): 
+    h, e = np.histogram(data, n)
+    p = h/data.shape[0]
+    return e, p
+
+def support_intersection(p, q): 
+    sup_int = (list(filter(
+                lambda x: (x[0]!=0) & (x[1]!=0), zip(p, q) )))
+    
+    return sup_int
+
+def get_probs(list_of_tuples): 
+    p = np.array([p[0] for p in list_of_tuples])
+    q = np.array([p[1] for p in list_of_tuples])
+    return p, q
+
+def kl_divergence(p, q): 
+    return np.sum(p*np.log(p/q))
+
+def js_divergence(p, q):
+    m = (1./2.)*(p + q)
+    return (1./2.)*kl_divergence(p, m) + (1./2.)*kl_divergence(q, m)
+
+def compute_kl_divergence_2(train_sample, test_sample, n_bins=20): 
+    """
+    Computes the KL Divergence using the support 
+    intersection between two different samples
+    """
+    e, p = compute_probs(train_sample, n=n_bins)
+    _, q = compute_probs(test_sample, n=e)
+
+    list_of_tuples = support_intersection(p, q)
+    p, q = get_probs(list_of_tuples)
+    
+    return kl_divergence(p, q)
+
+#########
+
+
+
+def compute_kl_via_ecdf(p_data, q_data):
+    # http://www.tsc.uc3m.es/~fernando/bare_conf3.pdf
+    dx = np.diff(np.sort(np.unique(p_data)))
+    dy = np.diff(np.sort(np.unique(q_data)))
+    ex, ey = min(dx), min(dy)
+    e = min(ex, ey) / 2
+    P = ECDF(p_data)
+    Q = ECDF(q_data)
+    
+    x = p_data
+    q_diff = np.array(Q(x) - Q(x-e))
+    p_diff = np.array(P(x) - P(x-e))
+    
+    #print(q_diff)
+    #print(q_diff > 0)
+    print(np.sum(q_diff > 0))
+    erase_idx = q_diff > 0
+    q_diff = q_diff[erase_idx]
+    p_diff = p_diff[erase_idx]
+    
+    if len(p_diff) == 0 or len(q_diff) == 0:
+        return -1
+    
+    KL = np.mean( np.log(p_diff) - np.log(q_diff) )
+    return KL
+	
+	
+from sklearn.kernel_ridge import KernelRidge
+
+def run_lengths(X):
+    
+    lengths = []
+    
+    # note that the first char will automatically get a +1
+    current_length = 0
+    a = X[0]
+    for x in X:
+        if x == a:
+            current_length += 1
+        else:
+            lengths.append(current_length)
+            a = x
+            current_length = 1
+            
+    lengths.append(current_length)
+    
+    return lengths
+
+def special_ecdf(x):
+    x = np.sort(x)
+    unique = np.unique(x)
+    N = len(x)
+    
+    run_length = run_lengths(x)
+    
+    y = (np.cumsum(run_length) - 0.5) / N
+    
+    #print(unique.shape)
+    #print(y.shape)
+    reg = KernelRidge().fit(np.expand_dims(unique, 1), y)
+    return reg, (unique, y)
+    """my.ecdf  <-  function(x)   {
+    x   <-   sort(x)
+    x.u <-   unique(x)
+    n  <-  length(x) 
+    x.rle  <-  rle(x)$lengths
+    y  <-  (cumsum(x.rle)-0.5) / n
+    FUN  <-  approxfun(x.u, y, method="linear", yleft=0, yright=1,
+                           rule=2)
+    FUN
+}  """
+    
+reg, (x, y) = special_ecdf(all_models['RealNVP'][36][1e-5][T_SCORE])
+lins = np.expand_dims(np.linspace(-2, 2, 30), 1)
+plt.scatter(lins, reg.predict(lins))
+#plt.scatter(x, y, s=0.5)
+#plt.xlim(-2, 2)
+
+----
+
+#ks_statistic, p_value = kstest(true_data, model_data, alternative='two-sided')
+                #print(f'model: {model} dim: {dim} sig: {sig}')
+                #kl = compute_kl_via_ecdf(true_data, model_data)
+                #kl_2 = compute_kl_divergence_2(true_data, model_data, 100)
+                #kl = relative_entropy_from_samples(true_data, model_data)
+                #kl = KLdivergence(true_data, model_data)
+                
+---------
+
+multi_normal = np.random.multivariate_normal([0, 0], np.eye(2), size=1000)
+gauss_norm = np.linalg.norm(multi_normal, axis=1)
+
+data = multi_normal.T / gauss_norm
+
+_, axs = plt.subplots(nrows=1, ncols=2, squeeze=False, figsize=(10, 3))
+
+axs[0, 0].scatter(x=data[0], y=data[1])
+_=sns.kdeplot(x=multi_normal[:, 0], y=multi_normal[:, 1], ax=axs[0, 1], thresh=0, levels=100, cmap='magma')
+
+
+#################
+
+    def _dunno(self, size):
+        X = np.linspace(vonmises.ppf(0.01, kappa=self.mises_kappa), vonmises.ppf(0.99, kappa=self.mises_kappa), size)
+        logpdf = vonmises.logpdf(X, kappa=self.mises_kappa)
+
+        embeddings = []
+        for x in X:
+            flat_embedding = np.zeros(self.dimensions)
+            self._embed(x, flat_embedding)
+            embeddings.append(flat_embedding)
+
+        embeddings = np.array(embeddings)
+        return X, embeddings, logpdf
+
+
+    def _sample_and_embed_data(self, flat_embedding):
+        rv_vonMises = vonmises.rvs(self.mises_kappa)
+        #mises_samples.append(rv_vonMises)
+        #s1 = self.sphere_radius * np.cos(rv_vonMises), self.sphere_radius * np.sin(rv_vonMises)
+        #flat_embedding[0:2] = s1
+        self._embed(rv_vonMises, flat_embedding)
+        return rv_vonMises
+		
+		
+		    def __create_sampled_list(self, size):
+        embeddings = []
+        for _ in range(size):
+            flat_embedding = np.zeros(self.dimensions)
+            sample_1d = self._sample_and_embed_data(flat_embedding)
+            embeddings.append(embeddings)
+        return embeddings
+		
+##########
+
+z, llh = all_models['true'][100][1e-2][MANIFOLD_DATA], all_models['true'][100][1e-2][CORRECTED_LLH]
+
+other_lln = all_models['NICE'][100][1e-2][CORRECTED_LLH]
+idx = np.argsort(z)
+plt.plot(z[idx], np.exp(llh[idx]), '-', color=get_model_color(model), label=model)
+plt.plot(z[idx], np.exp(other_lln[idx]), '-', color=get_model_color(model), label=model)
+
+#plt.hist(z[idx], density=True, histtype='stepfilled', alpha=0.2)
+
+---------
+
+# for uniform latent distributions
+        #t_score_divide_by_var = true_log_prob.var() > 0
+        t_score_divide_by_var = False
+        """
+        if t_score_divide_by_var:
+            true_var = true_log_prob.var()
+        else:
+            true_var = 1.0
+        """ 
+		
+.---------------
+
+        #jetzt aus gauss das testt set ziehen und von den anderen das train set
+                if config.dataset == 'gauss':
+            ...
+            #data, true_log_prob, manifold_position = dataset
+        else:
+            ...
+            #data, true_log_prob, manifold_position = dataset.train
+------------
+
+
+#def correct_using_true_distribution(centered_q, normal_p):
+#    normalizing_const = np.mean( np.exp(centered_q - normal_p) )
+#    logged_normalizing_const = np.log(normalizing_const)
+#    return centered_q - logged_normalizing_const, logged_normalizing_const
+
+
+----------
+
+"""
+        print(f'Info for {test_to_label[test]}')
+        for model, (ks, dim, var) in best_per_model.items():
+            if model == reference_model: continue
+            addition = ''
+            #if model in zero_var_model:
+            #    addition = f'| no inflation: {zero_var_model[model]:.2f}'
+            print(f'{model}:\t Best: {ks:.3f} at (dim: {int(np.sqrt(dim))}², σ²: {var:.0e}) {addition}')
+        print('-----------')
+        """
+		
+		-----------
+		
+Plotting Axis Stuff
+
+
+    """
+    if xlim is None:
+        #ax.set_ylabel('Density', fontsize=AXIS_FONT_SIZE)
+        # get rid of "outliers"
+        bottom, top = get_smallest_quantile_of_model(all_data, alpha=quantile_alpha)
+        if np.isfinite(bottom) and np.isfinite(top):
+            border = (top-bottom) * 0.10
+            ax.set_xlim([bottom-border, top+border])
+        #ax.set_xlim(left=bottom-border)
+    else:
+        ax.set_xlim(xlim)
+        
+    if ax.get_ylim()[1] > 1.3:
+        ax.set_ylim(top=1.3)
+    """
+	
+	--------
+	
+	
+	manifold_l_pd = self.log_pdf_on_manifold(samples)
+        print(samples.shape)
+        # density of manifold
+        # rotation matrices are orthogonal
+        back_rotation_matrix = self.rotation_matrix.T
+        d = self.get_embedding_dimensionality()
+        noise_log_pds = []
+        for sample in samples:
+            print(sample.shape)
+            standard_embedding = back_rotation_matrix @ sample
+            noise = standard_embedding[d:]
+            # as they are independent, we can just add them
+            noise_log_pd = np.sum( norm.logpdf(noise) )
+            noise_log_pds.append(noise_log_pd)
+
+        return manifold_l_pd + np.stack(noise_log_pds)
+--------
+
+    """
+    samples = norm.rvs(scale=scale, size=STATE_DENSITY_SAMPLE_COUNT)
+    if log:
+        pds = norm.logpdf(samples, scale)
+    else:
+        pds = norm.pdf(samples, scale)
+    """
+	
+----------------
+
+# densities regarding only manifold
+            z_plus_e = self._extract_manifold_data(flat_embedding)
+            inflated_manifold_data.append(z_plus_e)
+            inflated_llh_on_inflated_manifold.append(self._inflated_llh_on_manifold(z_plus_e))
+def _extract_manifold_data(self, data):
+        d = self.get_embedding_dimensionality()
+        return data[:d]
+		
+-----------
+
+def plot_state_density_of_prior(axs):
+    kde_kws = {'linewidth': 2}
+    for iD, dim in enumerate(dimensions):
+        samples = multivariate_normal.rvs(mean = np.zeros(dim), size=10000)
+        pds = multivariate_normal.logpdf(samples, mean = np.zeros(dim))
+        for ax in axs[iD].flatten():
+            # get_model_color('prior')
+            sns.distplot(pds, label='prior', hist=False, kde=True, color='r', norm_hist=True, 
+                         ax=ax, kde_kws=kde_kws)
+
+  -------------
+  
+  [quote="DzReal, post:2, topic:69170"]
+Calling [ `empty_cache()` ](https://pytorch.org/docs/stable/cuda.html#torch.cuda.empty_cache) releases all **unused** cached memory from PyTorch so that those can be used by other GPU applications
+[/quote]
+
+-------------
+
+STATE_DENSITY_SAMPLE_COUNT = 20000
+fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(20, 5), squeeze=True)
+
+log = False
+#plot_density_states(log=log, ax=ax)
+
+
+def get_new_color_gen():
+    color_idx = 0
+    while True:
+        clr = plt.get_cmap('tab10').colors[color_idx]
+        yield clr
+        color_idx += 1
+        
+get_new_color = get_new_color_gen()
+        
+def plot_multivariate_normal_state_dens(cov):
+    global get_new_color
+    plot_density_state_for_dist(multivariate_normal, dict(mean=[0, 0], cov=cov), 
+                                label=f'2D Gauss {cov}', color=next(get_new_color), log=log, ax=ax)
+
+plot_multivariate_normal_state_dens([[1, 0], [0, 1]])
+#plot_multivariate_normal_state_dens([[1, 1], [1, 2]])
+#plot_multivariate_normal_state_dens([[0.5, 0], [0, 2]])
+#plot_multivariate_normal_state_dens([[0.25, 0], [0, 4]])
+plot_multivariate_normal_state_dens([[1, 2], [2, 5]])
+#plot_multivariate_normal_state_dens([[2, 0], [0, 1.5]])
+#plot_multivariate_normal_state_dens([[0.25, 0], [0, 4]])
+#plot_multivariate_normal_state_dens([[0.5, 1], [0, 2]])
+#plot_density_state_for_dist(norm, norm_params, label='Gauss', color='k', log=log)
+
+def x_and_y_plus_2x_state_dens():
+    def pdf_y_plus_2x(x, y, alpha):
+        """this is the pdf of [x, y + alpha * x] = [a, b] (I guess)"""
+        a_pd = norm.pdf(x)
+        b_pd = 1 / sqrt(2 * np.pi) * np.exp( -1/2 * (y - alpha*x) ** 2)
+        return a_pd * b_pd
+    
+    global get_new_color
+    x, y = norm.rvs(size=(2,STATE_DENSITY_SAMPLE_COUNT))
+    
+    a_b_pdf = pdf_y_plus_2x(x, y, 2)
+    dist_plotter(a_b_pdf, '[x, y+2x]', next(get_new_color), ax, bw_adjust=0.5)
+    
+    # with relu
+    first_relu_trigger = 0.1
+    relu_zero = x < first_relu_trigger
+    x_2 = x[relu_zero]
+    y_2 = y[relu_zero]
+    
+    a_b_pdf[relu_zero] = multivariate_normal.pdf(np.column_stack((x_2,y_2)), mean=[0, 0], cov=np.eye(2))
+    dist_plotter(a_b_pdf, f'x > {first_relu_trigger}: [x, y+2x] else [x, y]', next(get_new_color), ax, bw_adjust=0.5)
+    """
+    ###################
+    # second relu layer
+    pds = np.zeros(STATE_DENSITY_SAMPLE_COUNT)
+    
+    second_relu_trigger = 2
+    # first part (i.e. first relu triggered)
+    first_relu_active = x > first_relu_trigger
+    a = x[first_relu_active]
+    b = y[first_relu_active] + 2 * a
+    
+    second_relu_active = b < second_relu_trigger
+    pds[first_relu_active] = pdf_y_plus_2x()
+    """
+    
+x_and_y_plus_2x_state_dens()
+
+x_label = 'log( p(x) )' if log else 'p(x)'
+ax.set_xlabel(x_label)
+ax.set_ylabel(f'p( {x_label} )')
+ax.set_title('State Density', size=TITLE_SIZE)
+
+    
+_=ax.legend()
+
+----------
+
+def get_tick_labels(X, bins):
+        size = X.max() - X.min()
+        size / bins
+        return X.min() + np.arange(bins) * size
+    
+-----------------------
+
+start = -15
+end = 20
+N = 10000
+
+Sigmoid = SigmoidData(dimension=36, train_size=N, growth_rate=1, x_start=start, x_end=end)
+
+fig, axs = plt.subplots(nrows=2, ncols=3, squeeze=True, figsize=(20, 5))
+axs = axs.flatten()
+
+area = np.linspace(start, end, N)
+area = np.float64(area)
+sigmoid_data = Sigmoid.sigmoid(area)
+
+ax_i = 0
+# sigmoid shape
+axs[ax_i].plot(area, sigmoid_data, '-', color='r', label='x, sig(x)')
+
+ax_i += 1
+# p(sig(x))
+#sns.distplot(sigmoid_data, label='sig(x), p(sig(x))', hist=True, bins=100, color='g', ax=axs[1],
+#            kde_kws={'bw_adjust': 0.001}, kde=False) # kde_kws={'cumulative':True})
+#Sigmoid._sample_on_manifold()
+#log_pdf = Sigmoid._log_pdf_2(sigmoid_data) 
+log_pdf = Sigmoid._log_pdf(sigmoid_data) 
+pdf = np.exp(log_pdf)
+axs[ax_i].plot(sigmoid_data, pdf, '-', color='b', label='sig(x), p(sig(x))')
+axs[ax_i].set_ylim([0, pdf.max()*0.1])
+ax_i += 1
+
+axs[ax_i].plot(sigmoid_data, log_pdf, '-', color='b', label='sig(x), log p(sig(x))')
+ax_i += 1
+
+# p(p(sig(x)))
+#sns.distplot(Sigmoid.train_data[LLH_IDX], label='p(y), p(p(y)) (y = sig(x))', hist=True, color='g', 
+#             ax=axs[ax_i], kde=True) # kde_kws={'cumulative':True}) kde_kws={'bw_adjust': 0.001}
+#axs[3].set_xlim([0, 100])
+#ax_i += 1
+sns.distplot(Sigmoid.train_data[MANIFOLD_DATA], label='y, p(y) (y = sig(x)) | KDE', hist=True, color='b', 
+             ax=axs[ax_i], kde_kws={'bw_adjust': 0.01}, kde=True) # kde_kws={'cumulative':True})
+#axs[3].set_xlim([0, 100])
+ax_i += 1
+
+sns.distplot(Sigmoid.train_data[LLH_IDX], label='log p(y), p(log p(y)) (y = sig(x)) | KDE', hist=True, color='g', 
+             ax=axs[ax_i], kde_kws={'bw_adjust': 0.5, 'cumulative':False}, kde=True) # kde_kws={'cumulative':True})
+#axs[ax_i].set_xlim([0, 15])
+ax_i += 1
+
+#sns.distplot(np.exp(Sigmoid.train_data[LLH_IDX]), label='p(y), p(p(y)) (y = sig(x)) | KDE', hist=True, color='g', 
+#             ax=axs[ax_i], kde_kws={'bw_adjust': 0.5, 'cumulative':False}, kde=True) # kde_kws={'cumulative':True})
+#axs[ax_i].set_xlim([1, 13706305])
+#axs[ax_i].set_xscale('log')
+#ax_i += 1
+
+#print(ax_i)
+for i in range(ax_i):
+    axs[i].legend()
+	
+---------------------------
+
+% Use only LaTeX2e, calling the article.cls class and 12-point type.
+
+\documentclass[12pt]{article}
+
+%\usepackage{scicite}
+\usepackage{times}
+
+\usepackage{dsfont}
+\usepackage{array}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{subfigure}
+\usepackage{bm}
+\usepackage{amsmath, amssymb}
+\usepackage{stmaryrd}
+\usepackage{amsfonts}
+\usepackage[shortlabels]{enumitem}
+\usepackage{hyperref} 
+\usepackage[makeroom]{cancel}
+\usepackage[bottom]{footmisc}
+\usepackage{caption}
+\usepackage{xcolor}
+%\usepackage[paperheight=60cm]{geometry}
+
+
+\usepackage[
+	backend=bibtex,
+	style=ieee,
+	citestyle=numeric
+]{biblatex}
+
+\graphicspath{img}
+
+\topmargin 0.0cm
+\oddsidemargin 0.2cm
+\textwidth 16cm 
+\textheight 21cm
+\footskip 1.0cm
+
+\newenvironment{sciabstract}{%
+\begin{quote} \bf}
+{\end{quote}}
+
+\renewcommand\refname{References and Notes}
+
+\newcounter{lastnote}
+\newenvironment{scilastnote}{%
+\setcounter{lastnote}{\value{enumiv}}%
+\addtocounter{lastnote}{+1}%
+
+\begin{list}%
+{\arabic{lastnote}.}
+{\setlength{\leftmargin}{.22in}}
+{\setlength{\labelsep}{.5em}}}
+{\end{list}}
+
+%\title{Discussion of\\ \textit{Spectral–Spatial Graph Convolutional Networks for %Semisupervised Hyperspectral Image Classification}}
+
+\title{\vspace{-4.0cm}
+	How to Hack Coupling Layers\\
+	\normalsize{David Luibrand}}
+
+%\author
+%{David Luibrand, 408183\\
+%	\normalsize{Pitch for a Master Thesis}
+%}
+
+
+% Include the date command, but leave its argument blank.
+
+
+%%%%%%%%%%%%%%%%% My Stuff %%%%%%%%%%%%%%%%
+
+%\raggedbottom
+
+%\addbibresource{Report_Luibrand.bib} 
+
+\date{}
+
+\newcommand{\timesc}{\mathclose \times}
+
+\newcommand{\pX}{p_\mathcal{X}}
+\newcommand{\pXT}{p_\mathcal{X}^\theta}
+\newcommand{\ft}{f^\theta}
+\newcommand{\Vt}{V^\theta}
+\newcommand{\nt}{\nabla_{\theta}}
+\newcommand{\X}{\mathcal{X}}
+\newcommand{\x}{\mathbf{x}}
+\newcommand{\z}{\mathbf{z}}
+\newcommand{\Z}{\mathcal{Z}}
+\newcommand{\pZ}{p_\mathcal{Z}}
+\newcommand{\XX}{\mathfrak{X}}
+\newcommand{\ZZ}{\mathcal{Z}}
+\newcommand{\Normal}{\mathcal{N}^D(\mathbf{0},\mathbf{1})}
+\newcommand{\Ex}{\mathds{E}_x}
+\renewcommand{\thefootnote}{\fnsymbol{footnote}}
+
+\newcommand{\s}{\boldsymbol{s}}
+
+
+\addbibresource{bib/library.bib} 
+
+
+%%%%%%%%%%%%%%%%% END OF PREAMBLE %%%%%%%%%%%%%%%%
+
+\begin{document} 
+% Make the title.
+\maketitle 
+
+\vspace{-1.0cm}
+
+\noindent $[X, Y] \sim \; F$\\
+$F$ is an unknown distribution.\\
+$[X, Y]$ is in the data space.\\
+"$\rightarrow$" means one coupling layer and we will go towards the latent space. \\
+Latent space will have a normal distribution as prior.\\
+$M$, is a scaling number with $M \gg c$ (denoted as "scaler" in the code)\\ 
+and $P(|X| > c, |Y| > c) > \delta/100$ (i.e. this procedure should work around $\delta$\% of the time).
+
+
+\begin{align*}
+\begin{bmatrix}
+	X\\Y
+\end{bmatrix}
+\rightarrow	&\;\;\text{// Initialisation}
+\\
+\begin{bmatrix}
+	X\\Y + M\cdot X
+\end{bmatrix}
+\rightarrow &\;\;\text{// Store X on top of Y by making it a really big number.}
+\\
+\begin{bmatrix}
+	X-(Y+M\cdot X) / M\\Y + M\cdot X
+\end{bmatrix}
+=
+\begin{bmatrix}
+	-Y / M\\Y + M\cdot X
+\end{bmatrix}
+\rightarrow &\;\;\text{// Remove X from the upper entry. }
+\\
+&\;\; \text{// Now the upper entry will contain a really small number.}
+\\
+\begin{bmatrix}
+	-Y / M\\Y + M\cdot X
+\end{bmatrix}
+\rightarrow &\;\;\text{//do nothing layer}
+\\
+\begin{bmatrix}
+	 Y + M \cdot X - Y / M\\Y + M\cdot X
+\end{bmatrix} 
+=
+\underbrace{\begin{bmatrix}
+(1-1/M)Y + MX\\Y + MX
+\end{bmatrix}}_\Lambda
+= 
+&\;\;\text{// add the bottom entry to the top. }
+\\ &\;\; \text{// Now both entries have approximately the same value }
+\\ &\;\; \text{// except for a small the error -Y/M.}\\
+\begin{bmatrix}
+X_5\\ Y_5
+\end{bmatrix} \rightarrow& \text{We now apply the loop that shrinks this distribution}\\
+& \text{close to 0.}\\
+& \text{(Explanation copied from other document to the bottom.)}\\ 
+\begin{bmatrix}
+X_5\\ Y_5 - X_5/2
+\end{bmatrix} =& \\
+\begin{bmatrix}
+%	(1-1/M)Y + MX\\Y + MX - \boldsymbol{(}(1-1/M)Y + MX\boldsymbol{)}/2
+	(1-1/M)Y + MX\\Y + MX - \frac{(1-1/M)Y + MX}{2}
+\end{bmatrix}
+=&\\
+\begin{bmatrix}
+	(1-1/M)Y + MX\\1/2(1+1/M) Y + (M/2) X
+\end{bmatrix}
+\end{align*}
+
+Lets check the volume change of the last vector.
+
+\begin{align*}
+\begin{bmatrix}
+(1-1/M)Y + MX\\1/2(1+1/M) Y + (M/2) X
+\end{bmatrix} &=
+\underbrace{\begin{bmatrix}
+M& (1-1/M)\\M/2 & 1/2(1+1/M)
+\end{bmatrix}}_\Omega
+\begin{bmatrix}
+X \\ Y
+\end{bmatrix}\\
+\\
+\det( \Omega ) &= M \cdot 1/2(1+1/M) - M/2 \cdot (1-1/M)\\
+&= M/2 + 1 - M/2 + 1/2 \\
+&= 1.5 \color{red}{\lightning}
+\end{align*}
+
+
+\end{document}
+
+------------------
+
+if np.isclose(data.mean(), 0., atol=1e-4):
+            addition = f'| range: [{data.min():.1f}, {data.max():.1f}]'
+        else:
+            addition = f'| mean: {data.mean():.1f}'
+        addition = ''
+        f'{model_name}{addition}'
+		
+		#kde_kws['fill'] = True
+            
+			
+------------
+Copied from somewhere
+
+from numpy import arange, array, bincount, ndarray, ones, where
+from numpy.random import seed, random, randint
+
+class WalkerRandomSampling(object):
+    # code from:
+    # https://gist.github.com/ntamas/1109133/30362d4a91cfadc5ab69c23c63705b919a31c8a9
+    
+    """Walker's alias method for random objects with different probablities.
+    
+    Based on the implementation of Denis Bzowy at the following URL:
+    http://code.activestate.com/recipes/576564-walkers-alias-method-for-random-objects-with-diffe/
+    """
+    
+    def __init__(self, weights, keys=None):
+        """Builds the Walker tables ``prob`` and ``inx`` for calls to `random()`.
+        The weights (a list or tuple or iterable) can be in any order and they
+        do not even have to sum to 1."""
+        n = self.n = len(weights)
+        if keys is None:
+            self.keys = keys
+        else:
+            self.keys = array(keys)
+
+        if isinstance(weights, (list, tuple)):
+            weights = array(weights, dtype=float)
+        elif isinstance(weights, ndarray):
+            if weights.dtype != float:
+                weights = weights.astype(float)
+        else:
+            weights = array(list(weights), dtype=float)
+
+        if weights.ndim != 1:
+            raise ValueError("weights must be a vector")
+
+        weights = weights * n / weights.sum()
+
+        inx = -ones(n, dtype=int)
+        short = where(weights < 1)[0].tolist()
+        long = where(weights > 1)[0].tolist()
+        while short and long:
+            j = short.pop()
+            k = long[-1]
+
+            inx[j] = k
+            weights[k] -= (1 - weights[j])
+            if weights[k] < 1:
+                short.append( k )
+                long.pop()
+
+        self.prob = weights
+        self.inx = inx
+
+    def random(self, count=None):
+        """Returns a given number of random integers or keys, with probabilities
+        being proportional to the weights supplied in the constructor.
+        When `count` is ``None``, returns a single integer or key, otherwise
+        returns a NumPy array with a length given in `count`.
+        """
+        if count is None:
+            u = random()
+            j = randint(self.n)
+            k = j if u <= self.prob[j] else self.inx[j]
+            return self.keys[k] if self.keys is not None else k
+
+        u = random(count)
+        j = randint(self.n, size=count)
+        k = where(u <= self.prob[j], j, self.inx[j])
+        return self.keys[k] if self.keys is not None else k
+		
+---------
+
+fig, axs = plt.subplots(nrows=len(variances), ncols=3, figsize=(17, len(variances)*3.5), squeeze=True)
+
+plt.suptitle(f'2D PDF for {DATASET_NAME} + Noise', size=22)
+for y_ax, var in enumerate(variances):
+    for x_ax, model in enumerate(MODEL_LIST):
+        ax = axs[y_ax, x_ax]
+        if model == 'true':
+            Z = all_models[model][2][var]['ambient']['embedded_data'].squeeze(1).squeeze(1)
+            Z = Z.cpu().numpy()
+        else:
+            Z = all_models[model][2][var]['ambient'][Z_IDX].squeeze(1)
+
+        X, Y = Z[:, 0], Z[:, 1]
+        
+        _, histo_density, (x_edges, y_edges) = approx_density(X, Y, alpha=0, bin_count=50)
+        #y_edges += 0.5
+        labeled_data = pd.DataFrame(data=histo_density, index=ranges_to_label_array(y_edges), 
+                                    columns=ranges_to_label_array(x_edges))
+        #print(labeled_data)
+        ax.plot(find_center(x_edges), find_center(y_edges), 'bo')
+        sns.heatmap(labeled_data, ax=ax, xticklabels=9, yticklabels=9, cbar=False)
+        #break
+    #break
+        
+    axs[y_ax, 0].set_ylabel(f' σ² = 1e{np.log10(var):.2f}', size=13)
+    
+axs[0, 0].set_title('p(X)', size=14)
+axs[0, 1].set_title('NICE(X)', size=14)
+axs[0, 2].set_title('RealNVP(X)', size=14)
+#labeled_data
+
+--------
+
+# get color min / max
+color_min = 0
+color_max = -1
+for y_ax, var in enumerate(variances):
+    if var == 0:
+        continue
+    for x_ax, model in enumerate(MODEL_LIST):
+        color_max = max(color_max, all_models[model][2][var]['ambient'][LLH_IDX].max())
+
+----------
+
+
+def find_center(edges):
+    start_idx = (edges > 0).argmax()
+    length_of_cell = edges[start_idx] - edges[start_idx-1]
+    #print(-edges[start_idx-1] / length_of_cell)
+    return start_idx #+ -edges[start_idx-1] / length_of_cell
+	
+def ranges_to_label_array(ranges):
+    return [f'{r:.1f}' for r in ranges[:-1]]
+
+	
+----------
+
+def compute_average_volume_change_2(volumes):
+    """computes the average log volume according to Davids reformulation """
+    a = (-volumes).max()
+    N = len(volumes)
+    # Vol in original space is logged
+    # log sum exp with the maximal a
+    # exp * (a + log (1/N sum_i exp( -V(x_i) - a ) ))
+    avg_log_volume = - (a + torch.log(torch.sum(torch.exp(-volumes - a))) - np.log(N))
+    return avg_log_volume
+	
+------------
+
+                    elif test == 'kstest':
+                        statistic, pvalue = kstest(true_llh, model_llh)
+                        distance = statistic
+
+
+--------------
+
+center = len(Z[0]) // 2
+    global ZZ
+    ZZ = Z
+    A = Z[:, center:]
+    B = Z[:, :center]
+    
+    cos = (A * B).sum(1) / (np.linalg.norm(A, axis=1)*np.linalg.norm(B, axis=1))
+    angles = np.arccos(cos)
+    #angles = [np.arctan(Z[:, i] / Z[:, i+1]) + (np.pi if Z[:, i] < 0 else 0) for i in range(USED_DIMENSION-1)]
+    #for i in range(USED_DIMENSION-1)
+    #    angles = [np.arctan(Z[:, i] / Z[:, i+1]) + (np.pi if Z[:, i] < 0 else 0) ]
+    
+    #angles = np.array(angles).T
+    # compute circular mean for angles
+    #sin = np.mean(np.sin(angles), axis=1)
+    #cos = np.mean(np.cos(angles), axis=1)
+    #average_angles = np.arctan2(sin, cos)
+    
+    #ZZ = average_angles
+    lengths = np.linalg.norm(Z, axis=1)
+
+    #X = lengths * np.cos(average_angles)
+    #Y = lengths * np.sin(average_angles)
+    X = lengths * np.cos(angles)
+    Y = lengths * np.sin(angles)
+    
+    return X, Y
+#reduce_dim_keep_length_and_angle(Z)
+            #center = len(Z[0]) // 2
+            #X = get_signed_mean(Z[:, center:])
+            #Y = get_signed_mean(Z[:, :center])
+            
+#angles = np.array(angles).T * 2
+    #sin = np.mean(np.sin(angles), axis=1)
+    #cos = np.mean(np.cos(angles), axis=1)
+    #average_angles = np.mean(angles, axis=1) #np.arctan2(sin, cos)
+    #print(length.shape)
+    
+def get_signed_mean(A):
+    """Interpolate in polar coordinates:
+    https://www.inference.vc/high-dimensional-gaussian-distributions-are-soap-bubble/"""
+    return (np.sqrt(1/USED_DIMENSION) * A).sum(axis=1)
+    #abs_mean = np.abs(A).mean(axis=1)
+    #make_negative = (A < 0).mean(axis=1) > 0.5
+    #abs_mean[make_negative] *= -1
+    return abs_mean
+
+Z = ZZ
+center = len(Z[0]) // 2
+    
+A = Z[:, center:]
+B = Z[:, :center]
+print(A.shape, B.shape)
+print((A * B).sum(1).shape)
+#angles = np.arccos(A.T @ B / (np.linalg.norm(A, axis=1)*np.linalg.norm(B, axis=1)))
+a = (A * B).sum(1) / (np.linalg.norm(A, axis=1)*np.linalg.norm(B, axis=1))
+np.arccos(a)
+
+Z = ZZ
+Z = all_models['NICE'][100][0.01]['ambient']['z']
+
+angles = np.mean([np.arctan(Z[:, i] / Z[:, i+1]) for i in range(USED_DIMENSION-1)], axis=0)
+lengths = np.linalg.norm(Z, axis=1)
+
+X = lengths * np.cos(angles)
+Y = lengths * np.sin(angles)
+#np.max(angles)
+#X.shape, lengths.shape, angles.shape
+
+
+quad_2 = np.logical_and(ancat < 0, cat > 0)
+    #angles[quad_2] = 1/2 * np.pi - angles[quad_2]
+    
+    quad_3 = np.logical_and(ancat < 0, cat < 0)
+    angles[quad_3] = np.pi + angles[quad_3]
+    
+    quad_4 = np.logical_and(ancat > 0, cat < 0)
+    angles[quad_4] = 1.5 * np.pi + angles[quad_4]
+	
+	
+--------
+
+def reduce_dim_keep_length_and_angle(Z):
+    ancat = Z[:, 0]  # x
+    cat = Z[:, 1]  # y
+    
+    angles = [np.arctan2(Z[:, i], Z[:, i+1]) for i in range(USED_DIMENSION-1)]
+    angles = np.array(angles).T
+    sin = np.mean(np.sin(angles), axis=1)
+    cos = np.mean(np.cos(angles), axis=1)
+    angles = np.arctan2(sin, cos)
+    
+    length = np.linalg.norm(Z, axis=1)
+
+    X = length * np.cos(angles)
+    Y = length * np.sin(angles)
+    return X, Y
+	
+----------
+	
+	let's say a given manifold X has a lower dimension than the embedding space.Let the embedding be [f(X), g(X)] (so X is 1 dimensional in this case).In certain cases (like the manifolds and embeddings we use), the embedding functions are invertible.Thus within one coupling layer step of NICE we can do [f(X), g(X) - g_approx( f^-1_approx( f(X) ) )] ≈ [f(x), 0].From this point onwards, NICE can make this vector arbitrary small e.g.
+[f(x), eps*f(x)] -> [f(x) - 1/eps * (eps*f(x)) , eps * f(x)] = [0, eps * f(x)]
+where eps is a really small number.
+
+---------
+
+            if approximated:
+                _, histo_density, (x_edges, y_edges) = approx_density(X, Y, alpha=0, bin_count=50, make_symmetric=True)
+                histo_density = np.flip(histo_density, axis=1)
+                sns.heatmap(histo_density.T, ax=ax, xticklabels=9, yticklabels=9, cmap='magma')
+                title = f'Approximated 2D PDF for {DATASET_NAME}'
+            else:
+			
+---------
+
+def remove_quantile_old(X, Y, alpha):
+    # length is the distance to the center. We will use this to cut off data
+    left_X, right_X = quantile_finder(X, alpha)
+    left_Y, right_Y = quantile_finder(Y, alpha)
+    
+    keep_data = np.logical_and(np.logical_and(X > left_X, X < right_X), np.logical_and(Y > left_Y, Y < right_Y))
+    
+    return X[keep_data], Y[keep_data], keep_data
+	
+--------
+
+x = norm.rvs(scale=scale, size=SIZE)
+                    x = np.double(x)
+                    #sns.distplot((norm.logpdf(x, scale=scale) - norm.logpdf(x)) / 2, color=color, ax=ax, kde=True, 
+                    #             kde_kws={'bw_adjust': 0.1, 'linestyle': 'dotted'}, hist=True, norm_hist=True)
+                    
+#mean = (norm.logpdf(p, scale=scale) - norm.logpdf(p)).mean() / 2
+                    #ax.axvline(mean, color=color, linewidth=2, linestyle='dotted')
+                    #mean, values = mean_scale_diff(var, dim)
+                    #ax.axvline(mean, color=color, linewidth=2, linestyle='dotted')
+                    #sns.distplot(values, hist=True, kde=True, color=color, ax=ax, 
+                    #             kde_kws={'bw_adjust': 0.1, 'cumulative': True}, norm_hist=True)
+					
+def mean_scale_diff(var, dim):
+    SIZE = 10000
+    # normal
+    scale = np.sqrt(var)
+    norm_x = norm.rvs(scale=scale, size=SIZE)
+    mean_inflation = (norm.logpdf(norm_x, scale=scale) - norm.logpdf(norm_x))#.mean()
+
+    uni_samples = uniform.rvs(loc=-0.5, scale=1, size=SIZE)
+    x = uni_samples + norm.rvs(scale=scale, size=SIZE)
+    mean_manifold = (np.log(pdf_N_plus_Uni(x, var)) - norm.logpdf(x))#.mean()
+
+    avg_llh_diff = ((dim - 1) * mean_inflation + mean_manifold) / dim
+    avg_llh_diff = mean_inflation
+    #avg_llh_diff = ((dim) * mean_inflation) / dim
+        #ax.axvline(mean, color=color, linewidth=0.8, linestyle='dotted')
+    avg_llh_diff /= 2
+    return avg_llh_diff.mean(), avg_llh_diff
+
+def scale_diff_2(var, dim):
+    SIZE = 1000
+    norm_x = norm.rvs(scale=scale, size=SIZE)
+    mean_inflation = (norm.logpdf(norm_x, scale=scale) - norm.logpdf(norm_x)).mean()
+    return mean_inflation
+PREDICTION_LINESTYLE = (0, (2, 10))
+
+
+--------
+
+def whatever(var):
+    def integral(x):
+        """x -> infty = 1
+        x -> -infty = -1"""
+        return np.sqrt(np.pi) * var * x / np.sqrt(2 - 2 * var)
+    return integral(1) - integral(-1)
+-np.log(whatever(10**-2))/4
+
+---------
+
+# insert point for which chi2 is infinity into chi2
+infty_point = -np.log(2 * np.pi * var) / 2
+insert_position = np.argmax(x < infty_point)
+x = np.insert(x, insert_position, infty_point)
+    
+------------
+
+    def _normalize_inflated_manifold_pd(self):
+        manifold_log_pd = self.plot_data[INFLATED_MANIFOLD_LOG_PD]
+
+        manifold_bounds = self.get_manifold_bounds()
+        plot_data_uniform_pd = 1 / (manifold_bounds[1] - manifold_bounds[0])
+        raise Exception('Please check me')
+        sampled_log_prob = np.log(plot_data_uniform_pd) + np.log(np.ones_like(manifold_log_pd))
+
+        self.plot_data[INFLATED_MANIFOLD_LOG_PD] = normalize_q_with_p(manifold_log_pd, sampled_log_prob)
+
+------
+
+
+        repeated_samples = np.tile(samples, (RotatedData.CONVOLVE_SAMPLE_COUNT, 1)).T
+        #convolve_samples = repeated_samples - self.random_manifold_samples
+        convolve_samples = repeated_samples - random_normal_samples
+        #pdf = norm.pdf(x=convolve_samples, scale=self.noise_scale)
+        pdf = self.pdf_on_manifold(convolve_samples)
+        mean = pdf.mean(axis=1)
+        if any(mean == 0) or not np.isfinite(mean).all():
+            print('aaaaa')
+
+        return np.log(mean)
+        #mean = np.mean(norm.pdf(x=samples - self.random_manifold_samples, scale=self.noise_scale), axis=1)
+        #mean = np.mean(self.pdf_on_manifold(samples - self.random_normal_samples), axis=1)
+        #return np.log(mean)
+----------
+
+            #sampled_dataset = load_dataset(config, eval_dataset_size, 'sampled')
+            #manifold_dataset = load_dataset(config, eval_dataset_size, 'manifold_grid')
+
+            """
+            true_model['sampled_dataset'] = sampled_dataset
+            true_model['manifold_dataset'] = manifold_dataset
+            #true_model['data'] = dataset.data
+            #true_model['densities'] = dataset.densiti
+
+            #true_model['ambient'] = dataset.data['full']
+            #true_model['manifold'] = dataset.data['inflated_manifold']
+
+            #true_model['ambient'][CORRECTED_PD] = true_model['ambient'][PD_IDX]
+            #true_model['manifold'][CORRECTED_PD] = true_model['manifold'][PD_IDX]
+            true_model['ambient'], true_model['manifold'] = dict(), dict()
+            true_model['ambient'][PD_IDX] = sampled_dataset.densities[FULL_INFLATED_LOG_PD]
+            true_model['manifold'][PD_IDX] = manifold_dataset.densities[INFLATED_MANIFOLD_LOG_PD]
+            true_model['ambient'][CORRECTED_PD] = sampled_dataset.densities[FULL_INFLATED_LOG_PD]
+            true_model['manifold'][CORRECTED_PD] = manifold_dataset.densities[INFLATED_MANIFOLD_LOG_PD]
+
+            true_model['ambient'][EMBEDDED_DATA] = sampled_dataset.data[EMBEDDED_DATA]
+            true_model['manifold'][EMBEDDED_DATA] = manifold_dataset.data[EMBEDDED_DATA]
+
+            for key in ['ambient', 'manifold']:
+                true_model[key][T_SCORE] = true_model[key][CORRECTED_PD] - true_model[key][CORRECTED_PD].mean()
+
+            #if evaluate_full_space:
+                #    data, true_llh = get_full_space_data(dimension, config.dataset, dataset)
+                #true_model['full_space_data'] = dict()
+                #true_model['full_space_data']['data'] = data
+                #true_model['full_space_data'][PD_IDX] = true_llh
+            """
+
+-------
+
+"""
+            if self.data_mode == 'full_grid':
+                densities[FULL_INFLATED_LOG_PD] = \
+                    self.__densities_for_full_grid_without_scaling(generated_data, infl_manifold_log_pd)
+            else:
+                densities[FULL_INFLATED_LOG_PD] = infl_manifold_log_pd
+            """
+            
+			
+	
+    def __densities_for_full_grid_without_scaling(self, generated_data, densities):
+        """Special density computation for full grid when noise is 0."""
+        full_data = generated_data[NONE_EMBEDDED_DATA]
+        full_grid_densities = np.ones(len(full_data)) * -np.inf
+        # initially all are set to true / this is a small hack to get that
+        remaining_idx = full_grid_densities == -np.inf
+
+        # go over all dimensions but skip the first dimension / this contains the manifold
+        for dim in range(full_data.shape[1] - 1):
+            remaining_idx = np.logical_and(remaining_idx, np.isclose(full_data[:, dim + 1], 0))
+        full_grid_densities[remaining_idx] = densities[INFLATED_MANIFOLD_LOG_PD]
+        return full_grid_densities
+
+-------------
+
+def plot_full_space_pdf(alpha=0.005):
+    if EXPERIMENT != 'full_space': 
+        # lazy exit / we use another function for this
+        return 
+    model_list = ['true', 'NICE', 'RealNVP']
+    log = USED_DIMENSION > 4
+    log_label = 'log' if log else '' 
+    fig, axs = plt.subplots(nrows=len(variances), ncols=len(model_list)+1, figsize=(4.25*(2+len(model_list)), len(variances)*3.5), 
+                            squeeze=False, dpi=300)
+    global ZZ
+    for var_idx, var in enumerate(variances):
+        colume_idx_offset = 0
+        for x_ax, model in enumerate(model_list):
+            ax = axs[var_idx, x_ax + colume_idx_offset]
+            # Data
+            if model == 'true':
+                data = all_models['true'][USED_DIMENSION][var]['full_space_data']
+                Z = data['data'].flatten(1)
+                Z = Z.cpu().numpy()
+            else:
+                data = all_models[model][USED_DIMENSION][var]['full_space']
+                Z = data[Z_IDX]
+                
+                ZZ = Z
+                if len(Z[0].shape) >= 2:
+                    Z = Z.squeeze(1)
+            
+            #X, Y, length = reduce_dim_keep_length_and_angle(Z)
+            #X, Y, keep_data = remove_quantile(X, Y, length, alpha=alpha)
+            
+            X = Z[:,0]
+            Y = Z[:,1]
+            #X, Y, keep_data = remove_quantile_old(X, Y, alpha=alpha)
+            pd = data[PD_IDX]
+            
+            plot_transformation(X, Y, pd, log, ax)
+            if model == 'RealNVP':
+                volume = data['volume']
+                colume_idx_offset += 1
+                plot_transformation(X, Y, volume, log, axs[var_idx, x_ax + colume_idx_offset])
+                
+        var_label = 0 if var == 0 else f'1e{np.log10(var)}'
+        axs[var_idx, 0].set_ylabel(f' σ² = {var_label}', size=13)
+        if var_idx == 2:
+            ...
+            #break
+
+    title_kwargs = dict(y=1.06, size=14)
+    axs[0, 0].set_title(f'{log_label} p(X)', **title_kwargs)
+    axs[0, 1].set_title('NICE(X)', **title_kwargs)
+    axs[0, 2].set_title('true NICE(X)', **title_kwargs)
+    #axs[0, 3].set_title('RealNVP(X)', **title_kwargs)
+    #axs[0, 4].set_title('true RealNVP(X)', **title_kwargs)
+        
+    title = f'2D {log_label} PDF for {DATASET_NAME} + Noise | dim(X) = {USED_DIMENSION}\n Ring at center with radius 0.5'
+    plt.suptitle(title, size=18, y=0.92)
+    
+    #fig.savefig(f'transformations/dim_{USED_DIMENSION} {DATASET_NAME} {manifold_or_ambient} {pd_idx} {log_label}.png')
+    
+if USED_DIMENSION > 2:
+    alpha = 0.005
+else:
+    alpha = {'von Mises': 0.001, 'Smooth Step': 0.01, 'Uniform': 0.005}[DATASET_NAME]
+
+plot_full_space_pdf(alpha=0)
+
+
+----------
+
+def plot_jacobian_of_slice(alpha=0.005):
+    if not EVALUATE_FULL_SPACE:
+        # lazy exit / we do the functions above in this case
+        return
+    log = USED_DIMENSION > 4
+    log_label = 'log' if log else '' 
+    fig, axs = plt.subplots(nrows=len(variances), ncols=len(model_list)+1, figsize=(4.25*(2+len(model_list)), len(variances)*3.5), 
+                            squeeze=False, dpi=300)
+    global ZZ
+    for var_idx, var in enumerate(variances):
+        colume_idx_offset = 0
+        for x_ax, model in enumerate(model_list):
+            ax = axs[var_idx, x_ax + colume_idx_offset]
+            # Data
+            if model == 'true':
+                data = all_models['true'][USED_DIMENSION][var]['full_space_data']
+                Z = data['data'].flatten(1)
+                Z = Z.cpu().numpy()
+            else:
+                data = all_models[model][USED_DIMENSION][var]['full_space']
+                Z = data[Z_IDX]
+                
+                ZZ = Z
+                if len(Z[0].shape) >= 2:
+                    Z = Z.squeeze(1)
+            
+            #X, Y, length = reduce_dim_keep_length_and_angle(Z)
+            #X, Y, keep_data = remove_quantile(X, Y, length, alpha=alpha)
+            
+            X = Z[:,0]
+            Y = Z[:,1]
+            #X, Y, keep_data = remove_quantile_old(X, Y, alpha=alpha)
+            pd = data[PD_IDX]
+            
+            plot_transformation(X, Y, pd, log, ax)
+            if model == 'RealNVP':
+                volume = data['volume']
+                colume_idx_offset += 1
+                plot_transformation(X, Y, volume, log, axs[var_idx, x_ax + colume_idx_offset])
+                
+        var_label = 0 if var == 0 else f'1e{np.log10(var)}'
+        axs[var_idx, 0].set_ylabel(f' σ² = {var_label}', size=13)
+        if var_idx == 2:
+            ...
+            #break
+
+    title_kwargs = dict(y=1.06, size=14)
+    axs[0, 0].set_title(f'{log_label} p(X)', **title_kwargs)
+    axs[0, 1].set_title('NICE(X)', **title_kwargs)
+    axs[0, 2].set_title('true NICE(X)', **title_kwargs)
+    #axs[0, 3].set_title('RealNVP(X)', **title_kwargs)
+    #axs[0, 4].set_title('true RealNVP(X)', **title_kwargs)
+        
+    title = f'2D {log_label} PDF for {DATASET_NAME} + Noise | dim(X) = {USED_DIMENSION}\n Ring at center with radius 0.5'
+    plt.suptitle(title, size=18, y=0.92)
+    
+    #fig.savefig(f'transformations/dim_{USED_DIMENSION} {DATASET_NAME} {manifold_or_ambient} {pd_idx} {log_label}.png')
+    
+if USED_DIMENSION > 2:
+    alpha = 0.005
+else:
+    alpha = {'von Mises': 0.001, 'Smooth Step': 0.01, 'Uniform': 0.005}[DATASET_NAME]
+
+plot_jacobian_of_slice(alpha=0)
+
+----------
+
+# Exactly Manifold:
+
+    # plot data will only show data on the manifold.
+    # thus we need to normalize differently.
+    # We use the uniform samples that were produced on the manifold for the reference dist.
+    """
+    manifold_bounds = dataset_info.get_manifold_bounds()
+    plot_data_uniform_pd = 1 / (manifold_bounds[1] - manifold_bounds[0])
+    sampled_log_prob = np.log(plot_data_uniform_pd * np.ones_like(model['mani_plot'][LLH_IDX]))
+
+    model['mani_plot'][CORRECTED_LLH] = normalize_q_with_p(model['mani_plot'][LLH_IDX], sampled_log_prob)
+    """
+    # Manifold + Noise
+    #model['manifold'][CORRECTED_PD], norm_const = normalize_q_with_p(model['manifold'][PD_IDX],
+                                                                     #true_model['manifold'][PD_IDX])
+    #model['manifold'][CORRECTION_TERM] = norm_const
+
+--------------
+
+if model == 'true':
+                            # entropy for true
+                            distance = true_pd.mean()
+                        else:
+                            nice_loss = all_models['NICE'][dim][var][data_idx][PD_IDX].mean()
+                            realnvp_loss = all_models['RealNVP'][dim][var][data_idx][PD_IDX].mean()
+                            distance = (nice_loss - realnvp_loss) # / (np.log(2)*dim)
+							
+							
+							
+						"""
+            max_y_val = ax.get_ylim()[1]
+            if not y_log and max_y_val > y_top and test != 'loss':
+                ax.set_ylim([0, y_top])
+            """
+			
+			
+----
+
+wandb before upgrade
+0.10.20
+
+
+---------
+
+true_plot_params = [None]*3
+        # find max pd value
+        pd_offset = float('-inf')
+        v_min = float('inf')
+        v_max = float('-inf')
+        print('var 10^', np.log10(var))
+        if var == 0:
+            v_min, v_max = None, None
+        else:
+            for x_ax, model in enumerate(model_list):
+                pd = all_models[model][USED_DIMENSION][var]['full_grid'][PD_IDX]
+                #pd_offset = max(pd.max(), pd_offset)
+                print(f'{model} min: {pd.min()} max: {pd.max()}')
+                if np.isfinite(pd.min()):
+                    v_min = min(v_min, pd.min())
+                if np.isfinite(pd.max()):
+                    v_max = max(v_max, pd.max())
+            print('min, max: ', v_min, v_max)
+        pd_offset = None
+        print('')
+		v_min, v_max = None, None
+		
+		
+    return [None]*3
+    if len(pd_finite) == 0 or len(pd_finite) == 0:
+        return [None]*3
+    
+    v_min = pd_finite.min()
+    v_max = pd_finite.max()
+    
+    offsetter = offsetter if np.isfinite(offsetter) else None
+    v_min = v_min if np.isfinite(v_min) else None
+    v_max = v_max if np.isfinite(v_max) else None
+        
+    return v_min, v_max, offsetter
+
+
+
+"""#pd = pd - pd[np.isfinite(pd)].mean()
+    if var > 0:
+        #    pd += 35/2 * np.log(2 * np.pi * var)
+        
+        print(34/2 * np.log(2 * np.pi * var))
+        pd += 10/2 * np.log(2 * np.pi * var)
+    """
+    #pd -= pd.max()
+    #print('var', np.log10(var), ' min max: ', v_min, v_max, ' offsetter: ', offsetter)
+    """if offsetter is None:
+        sorted_pd = np.sort(pd)
+        #print(sorted_pd[round(0.99 * len(sorted_pd))] )
+        offsetter = sorted_pd[round(0.99 * len(sorted_pd))]    
+        pd -= offsetter
+        
+        exped = np.exp(pd)
+        removed_vals = np.logical_not(np.isclose(exped, 0, atol=1e-10))
+        pd = pd[removed_vals]
+        X = X[removed_vals]
+        Y = Y[removed_vals]
+    else:
+        pd -= offsetter
+    """
+    
+    if not log:
+        pd = np.exp(pd)
+        no_pd = np.isclose(pd, 0)
+    else:
+        # plot -inf points
+        no_pd = np.isinf(pd)
+		
+---------
+
+# dim, var, model: (min, max)  # 'Smooth Step'
+# model: (true, NICE, RealNVP, RealNC)
+PLOT_PARAMS = \
+        {2: None, 
+              36:
+                  {
+                      0:     [(-3.91, -1.41), (0, 70), (0, 70), (0, 70)],
+                      #10**-6: [(200, 208), (50, 208), (50, 208), (-50, 0)],
+                      10**-6: [(203, None), (65, None), (65, None), (-70, None)],
+                      10**-4: [(123, 127), (63, 127), (63, 127), (-100, 127)],
+                      10**-2: [(10, None), (10, None), (10, None), (-50, None)],
+                      10**-0.5: [(-20, -13.5), (-20, -13.5), (-20, -13.5), (-50, -13.5)],
+                      10**0.25: [(-63, -43.8), (-63, -43.8), (-63, -43.8), (-63, -43.8)]
+                  }
+        }
+
+# var, model
+used_var = 10**-2
+CURRENT_THING = used_var, 'true'
+#CURRENT_THING = used_var, 'NICE'
+#CURRENT_THING = used_var, 'RealNVP'
+#CURRENT_THING = used_var, 'RealNC'
+
+global PLOT_PARAMS
+#print('min', pd_finite.min(), ' max', pd_finite.max())
+#v_min, v_max = PLOT_PARAMS[USED_DIMENSION][var][model]
+    
+   -----------
+   
+  prior_var = var if 'adjust_prior_var' in dir(config) and config.adjust_prior_var else 1
+                if prior_var == 0: prior_var = 1
+
+                all_data['prior'] = multivariate_normal.logpdf(multivariate_normal.rvs(size=100000 if SHOW_CASE else 1000, cov=prior_var*np.eye(dim)), 
+                                                               cov=prior_var*np.eye(dim))
+                all_data['prior'] /= dim
+                if idx == T_SCORE:
+                    all_data['prior'] -= all_data['prior'].mean() 
+                if idx == CORRECTED_PD:
+                    #all_data['prior'] += -all_data['prior'].mean() + all_data['true'].mean()
+                    ...
+-------------
+			  
+    # set the minimum x lims
+    for ax_cols in axs.T:
+        for ax in ax_cols:
+            ...
+            ax.set_xlim(ax.limx)
+        continue
+        limits = np.array([ax.limx for ax in ax_cols])
+        limx = limits[:,0].min(), limits[:,1].max()
+        for ax in ax_cols:
+            ax.set_xlim(limx)
+			
+-----------
+
+    for key in model.keys():
+        if key not in ['ambient', 'manifold']:
+            continue
+
+        # then we can use the solid normalizer
+        if key == 'ambient' and solid_normalizer is not None:
+            model[key][CORRECTED_PD], model[key][CORRECTION_TERM] = model[key][PD_IDX] + solid_normalizer, solid_normalizer
+        else:
+            model[key][CORRECTED_PD], model[key][CORRECTION_TERM] = normalize_q_with_p(model[key][PD_IDX], true_model[key][PD_IDX])
+
+
+------
+
+$v_{max} := \max_x q(x)$<br>
+$v_{min} := (1-\alpha)v_{max}$<br>
+As we are plotting in log space: <br>
+$v_{\log max} := \log v_{max}$<br>
+$v_{\log min} := \log(1-\alpha) + \log v_{max}$<br>
+We choose $\alpha := 0.99999$, thus $\log(1-\alpha) \approx -11.5$
+
+Ideally show something like 90% of the entire mass.<br>
+Not possible as we are looking at a slice and don't know how the rest of the space is shaped.<br>			
+
+------------
+
+#maximum = pd_finite > v_max
+        #ax.scatter(X[maximum], Y[maximum], c='w', s=2, marker='o', linewidths=0)
+        #not_max = np.logical_not(maximum)
+        #X, Y, pd_finite = X[not_max], Y[not_max], pd_finite[not_max]
+		
+		
+-------
+
+	Matlab:
+	f = @(v, x) log(v) - 1/2 * x^2* v^2;
+fmesh(f, [0 3 -2 2])
+
+
+----------
+
+In Section \ref{proof} we proof that the divergence of the state density is the same for a fixed dimensionality of the manifold and 
+varying dimensionality of the embedding space.
+
+The dimensional gap is the gap between the manifold space and the embedding space $dim(X) - dim(M) = D - d$, the dimensional ratio is $\frac{d}{D}$.
+
+
+We have shown that for a fixed manifold dimensionality and a none-curved embedding 
+additional data dimensionality do not render the state density harder to learn.
+Additionally, the lower the dimensional ratio, the closer the state density of the data to the prior (up to translation).
+This can be seen by the random variable that defines the state density by its pdf.
+Note that we use rotation for embedding and that the state density of a random variable and its rotated version are the same.
+Thus we can look at the none-rotated random variable of the data $[L_1, ..., L_d, N_{d+1}, ..., N_D] =: X$ with $L_i := M_i + N_i$.
+The state density is the pdf of $\log p(X)$.
+\begin{align}
+\log p(X)&= \log p([L_1, ..., L_d, N_{d+1}, ..., N_D])\\
+&= \log p(L_1, ..., L_d, N_{d+1}, ..., N_D) \\
+&= \sum_{i=1}^{d} \log p(L_i| L_{i+1:d}) + \sum_{j=d}^{D} \log p(N_j)
+\end{align}
+
+This leads to the hypothesis that NICE performs better with high dimensional gap and worse with small dimensional gap if the shape of the state density from the manifold differs from the
+state density of NICE.
+
+\footnotetext{Note too important: Central limit theorem does not help to get closer to the state density of $\sum_{i=1}^{d} \log p(L_i| L_{i+1:d})$ as it is dependent on the variance of $L_i| L_{i+1:d}$, while all $\log p(N)$ have a fixed variance.}
+
+\begin{align}
+\KL(P^{{M_{d_1}}, D_1}\| Q_\text{NICE} (P^{{M_{d_1}}, D_1})) &>
+\KL(P^{{M_{d_2}}, D_2}\| Q_\text{NICE} (P^{{M_{d_2}}, D_2}))\\
+\text{for } \frac{d_1}{D_1} &> \frac{d_2}{D_2}\\
+\text{or is it just } d_1 &> d_2 \text{ ? }
+\end{align}
+
+\newpage
+
+\subsection{Appendix}
+\subsection{Proof of State Density Divergence} \label{proof}
+In this section we show that divergence of the state densities from the prior and the data 
+stay the same for fixed $dim(M)$ and varying $dim(X)$.
+
+The state density of random variable $X$ can be defined by the pdf of the random variable $\log p(X)$.
+Note that we use rotation for embedding and that the state density of a random variable and its rotated version are the same.
+Thus we can look at the none-rotated random variable of the data $[L_1, ..., L_d, N_{d+1}, ..., N_D] =: X$ with $L_i := M_i + N_i$.
+Let $L$ be $[L_1, ..., L_d]$.
+
+\begin{align}
+\log p(X)&= \log p([L_1, ..., L_d, N_{d+1}, ..., N_D])\\
+&= \log p(L_1, ..., L_d, N_{d+1}, ..., N_D) \\
+&= \underbrace{\log p(L)}_\Phi + \underbrace{\sum_{j=d}^{D} \log p(N_j)}_\Psi
+\end{align}
+
+Obviously $\Phi$ and $\Psi$ are independent.
+The pdf of $\Phi$ and $\Psi$ are $p_\phi$ and $p_\psi$.
+The distribution of $\Phi + \Psi$ is denoted as $F$ with pdf $q$.
+The scaling layer of NICE is equivalent to having a flexible prior $\N^D(\textbf{0}, \textbf{c}\mathds{1}_D)$, in the sense that the scaling vector $\textbf{c}$ can be learned.
+The pdf of the prior is denoted $p$.
+
+The state density of the prior is the pdf of $\log p(\textbf{N})$, with $\textbf{N} \sim \N^D(\textbf{0}, \textbf{c}\mathds{1}_D)$.
+As $\log p(\textbf{N}) = \sum_{i=0}^{D} \log p(N_i)$ 
+
+Lets look at the KL-Divergence of $F$ and the prior.
+
+\begin{align}
+\KL(\N^D(\textbf{0}, \textbf{c}\mathds{1}_D) \| F) =& \int_\mathcal{X} p(x) \log
+\end{align}
+-----------
+
+            #ax.legend(fontsize=8, loc='upper left')
+
+    #handles, labels = axs[0][0].get_legend_handles_labels()
+    #fig.legend(handles, labels, loc='lower center')
+
+--------
+
+right_data = quantile_finder(logpdf_prior, 0.01)[1]
+    right_true = quantile_finder(true_pd, 0.01)[1]
+    #logpdf_prior_meanshift = logpdf_prior - logpdf_prior.max() + true_pd.max()
+    #logpdf_prior_meanshift = logpdf_prior - right_data + right_true
+    distance = wasserstein_distance(logpdf_prior, true_pd)
+    logpdf_prior_meanshift = logpdf_prior - distance
+	
+	------  
+-----------
+
+
+    @staticmethod
+    def linspace_include_zero(range, num):
+        """creates a lin space where 0 is included. Needed for grid function"""
+        # this makes sure 0 is included.
+        y_1 = np.linspace(-range, 0, num // 2)
+        y_2 = np.linspace(0, range, num // 2)
+        # this makes sure 0 does not appear twice
+        y = np.concatenate((y_1, y_2[1:]))
+
+        return y
+
+
+-------
+x_min, y_min = data_X[min_len], data_Y[min_len]
+ax_origin.plot([x_min, x_min], [y_min-0.25, y_min+0.25], c=get_model_color(model), 
+                           linewidth=0.5, label=f'argmin norm for {model}')
+            
+-----
+
+if model == 'NICE':
+                #print(pd.shape, length.shape, pd.argmax(), length.argmin())
+                #print('max of pd', length[pd.argmax()], pd.max())
+                #print('min of length', length[length.argmin()], pd[length.argmin()])
+                ...
+                #print('--')
+				
+-------
+
+        #return self.weight.view(*self.shape).expand(*x.size()).contiguous().view(x.size(0), -1).sum(1, keepdim=True)
+        #return self.weight.view(*self.shape).repeat(*x.size()).view(x.size(0), -1).sum(1, keepdim=True)
+        try:
+            if len(self.weight) > 1:
+                self.weight.sum(1).repeat(len(x))
+        except IndexError:
+            x = x
+
+        if len(self.weight) == 1:
+            return (self.weight * x.shape[1:].numel()).repeat(len(x))
+        else:
+            return self.weight.sum().repeat(len(x))
+			
+			
+			        bias = self.bias
+        weight = self.weight
+		
+		----
+		
+		# only one plot necessary
+        labels = [label for label in np.array(labels) if 'norm' not in label]
+		
+-------
+    if MODE == 'real':
+        epochs = 400
+        num_blocks = 3
+        train_samples = 1000
+    elif MODE == 'quick':
+        epochs = 100
+        num_blocks = 3
+        train_samples = 500
+        dimensions = [6**2]
+        variances = [1e-1, 1e-0]
+		
+---------
+
+pip install wandb
+pip install tqdm
+pip install pandas
+pip install prettytable
+pip install tensorboard
+pip install cudatoolkit=10.2
+pip install cmocean
+pip install scikit-learn
+pip install requests
+pip install tensorboardx
+pip install h5py
+pip install tqdm
+pip install pandas
+pip install seaborn
+pip install prettytable
+pip install wandb
+
+pip3 install torch==1.10.2+cu102 torchvision==0.11.3+cu102 torchaudio===0.10.2+cu102 -f https://download.pytorch.org/whl/cu102/torch_stable.html
+
+-------
+
+logged into node44
+
+-------
+
+
+        # Save metrics table
+        """
+        David: never used this anyway and it bugs
+        metric_table = get_metric_table(self.train_metrics, epochs=list(range(1, self.current_epoch+2)))
+        with open(os.path.join(self.log_path,'metrics_train.txt'), "w") as f:
+            f.write(str(metric_table))
+        metric_table = get_metric_table(self.eval_metrics, epochs=[e+1 for e in self.eval_epochs])
+        with open(os.path.join(self.log_path,'metrics_eval.txt'), "w") as f:
+            f.write(str(metric_table))
+        """
+		
+		
+		--------
+		
+		
+    def summed_none_log_loss(self, z, sldj, mean):
+        prior_ll = self.prior.log_prob(z)
+        #bpd = -self.summed_nonelog ** (prior_ll + sldj - math.log(2) * z.shape[1])
+        #bpd = -self.summed_nonelog ** (prior_ll + sldj)
+        total_ll = prior_ll + sldj
+        # a^b = exp( b * log(a) )
+        bpd = -torch.exp(total_ll * np.log(self.summed_nonelog))
+        #individual_ll = self.summed_nonelog ** prior_ll * self.summed_nonelog**sldj
+        #bpd = individual_ll / 1.1**(math.log(2) * z.shape[1])
+        if mean:
+            return bpd.mean()
+        return bpd
+		
+		
+		
+		
+		        if 'summed_nonelog' in dir(args) and args.summed_nonelog is not None:
+            self.summed_nonelog = args.summed_nonelog
+        else:
+            self.summed_nonelog = None
+        #if self.summed_nonelog:
+        #    self.prior = torch.distributions.Normal(torch.zeros(1).cuda(), torch.ones(1).cuda())
+
+
+parser.add_argument('--summed_nonelog', default=None, type=float, help='#####')
+
+        if self.summed_nonelog is not None:
+            return self.summed_none_log_loss(z, sldj, mean)
+
+-----------
+
+in embedding
+
+beep()
+        std = embedded_data / (embedded_data.max(0)[0] - embedded_data.min(0)[0])
+        meaned = std - std.min(0)[0]
+        return meaned
+        #####
+		
+		
+		
+		
+iLogit
+beep()
+        layers.append(passThrough(iLogits()))
+        beep()
+		
+		
+---------
+
+    elif args.dataset == 'sphere':
+        org_radius = args.sphere_radius
+        radius_seed = [(org_radius / 2, RotatedData.FIXED_SAMPLE_SEED),
+                       (org_radius / 10, RotatedData.FIXED_SAMPLE_SEED),
+                       (org_radius / 100, RotatedData.FIXED_SAMPLE_SEED),
+                       (org_radius, 42),
+                       (org_radius, 1337)]
+
+        for radius, rotation_seed in radius_seed:
+            dataset = VonMises(sphere_radius=radius, dimension=args.dimensions, size=100,
+                               mises_kappa=args.mises_kappa, rotation_seed=rotation_seed, data_mode='sampled')
+
+            train_loader = DataLoader(dataset.data[EMBEDDED_DATA], batch_size=args.batch_size, shuffle=False,
+                                      num_workers=args.num_workers, pin_memory=args.pin_memory)
+            eval_loaders[f'{radius:.1f}, {rotation_seed}'] = train_loader
+    elif args.dataset == 'line':
+        """radius_seed = [(2, RotatedData.FIXED_SAMPLE_SEED),
+                       (10, RotatedData.FIXED_SAMPLE_SEED),
+                       (1, 42),
+                       (1, 1337)]
+
+        for length, rotation_seed in radius_seed:
+            dataset = LineData(line_length=length, dimension=args.dimensions,
+                               size=100, rotation_seed=rotation_seed, data_mode='sampled')
+
+            train_loader = DataLoader(dataset.data[EMBEDDED_DATA], batch_size=args.batch_size, shuffle=False,
+                                      num_workers=args.num_workers, pin_memory=args.pin_memory)
+            eval_loaders[f'{length:.1f}, {rotation_seed}'] = train_loader"""
+			
+			
+---------
+
+# Keep this!
+                    #label = f'{model} | Best σ²: {var_to_label(non_zero_var[non_zero_scores.argmin()])} score: {non_zero_scores.min():.2f}'
+                    
+					
+------
+
+if model == 'NICE':
+                zero_point = np.isclose(data_X, 0)
+                axs[var_idx, model_idx*per_model_factor+3].scatter(norm_latent_X[zero_point], norm_latent_Y[zero_point], 
+                                                                   c=get_model_color(model), s=50, marker="v", 
+                                                                   label=f'{model}', alpha=0.5)
+                
+                latent_X, latent_Y = Z[:, 0], Z[:, 1]
+                axs[var_idx, model_idx*per_model_factor+2].scatter(latent_X[zero_point], latent_Y[zero_point], 
+                                                                   c=get_model_color(model), s=50, marker="v", 
+                                                                   label=f'{model}', alpha=0.5)
+																   
+																   
+    #right_data = quantile_finder(logpdf_prior, 0.01)[1]
+    #right_true = quantile_finder(true_pd, 0.01)[1]
+    #logpdf_prior_meanshift = logpdf_prior - logpdf_prior.max() + true_pd.max()
+    #logpdf_prior_meanshift = logpdf_prior - right_data + right_true
+	
+---------
+
+"""
+            if prior_inflation_adjustment:
+                for model in all_data.keys():
+                    adjustment_var = 1 if model == 'prior' else var
+                    if adjustment_var == 0:
+                        adjustment_var = 1
+                    all_data[model] += np.log(2 * np.pi * adjustment_var) / 2
+            """       
+			
+-----
+
+	\item \label{mf4} Taking out the effect of the noise to the DoS suggests a deflation term.
+	Section \ref{deflation_term}.
+
+\subsection{Suggested Deflation} \label{deflation_term}
+This section is not sound yet and needs more mathematical backing.
+The deflation term coincides with the findings of \cite{inflation}, 
+but that of \cite{inflation} is more straight forward and more general.
+
+Recall that Equation \ref{conv} can be computed by convolution.
+
+Uniform $U[a,b]$ noise has a dirac delta function at position $\log (b-a) =: \tau$ as DoS (see Section \ref{uniform_identity}).
+Clearly by convolving with a delta function at position $\tau$, we translate the original DoS by $\tau$.
+For the density of an element $k$ of the manifold this means $p(k) := \tau \cdot m(k)$.
+($m$ is the pdf of the manifold, $p$ is the pdf of the data space).
+Thus to get the density of the manifold for the learned distribution we should deflate by $\frac{1}{\tau}$.\\
+
+
++++++++++++++++
+
+
+        # this one was computed by sampling from the model / to other is computed by sampling from P
+        #solid_normalizer = model['model_normalizer'] if 'model_normalizer' in model else None
+        #if solid_normalizer is not None:
+        #    model['ambient'][CORRECTED_PD], model['ambient'][CORRECTION_TERM] = \
+        #        model['ambient'][PD_IDX] + solid_normalizer, solid_normalizer
+        #else:
+		
+----------
+
+#if test == 'wasserstein' and model == 'true':
+            #    handles, labels = ax.get_legend_handles_labels()
+            #    ax.legend(np.array(handles)[np.array(labels) == adjusted_prior_label], [adjusted_prior_label])
+            
+# we know the limits => in order to make them more comparable, we set them equal for all
+            #if dim == 2 and DATASET_NAME != 'Gauss':
+                #if test == 'wasserstein':
+                #    ax.set_yticks([10**-1.5, 10**-1., 10**-0.5, 10**0, 10**.5, 10**1])
+                #y_limits = {'kl': (0.001095583502556784, 0.802874140434624), 'kl_mani': (0.00039976343885510127, 0.45675019910671677), 'wasserstein': (0.005172997533208812, 10.86192455110721)} 
+                #ax.set_ylim(y_limits[test])
+				
+				
+	print(ratios)
+        print(ratio_exceeded)
+        print('---------')
+        
+--------
+
+\subsubsection{A Metric for the Density of States Difference} \label{metric}
+We will derive a metric and a representation of this metric to later show if the DoS was learned properly.
+
+
+If we want to find the distance in DoS for two random vectors $X$ and $Y$ (with $\dim(X) = \dim(Y) = D$)
+we should take account their dimensionality. 
+Otherwise we could accumulate small errors even though the DoS for every random variable of the vectors $X$ and $Y$ 
+is almost the same ($\text{DoS}(X_i) \approx \text{DoS}(Y_i)$).\\
+Thus our metric normalizes the DoS with its dimension ($\frac{\log p(X)}{\dim(X)}$).
+
+\noindent NICE can not change the shape of the DoS, thus to figure out if NICE has approximated 
+the DoS as good as possible, we are interested in where the mean of the DoS is.
+Thus we compute the DoS distance $\DosDist$ between two random vectors $X$ and $Y$ like
+
+\begin{equation}
+	\left| \mathds{E}_{x \sim X}\left[ \frac{\log p_x(x)}{\dim} \right] - \mathds{E}_{y \sim Y}\left[ \frac{\log p_y(y)}{\dim} \right] \right| =: \DosDist(X, Y)
+\end{equation}
+Which is equivalent to the square root of the maximum mean discrepancy ($\MMDDoS$) between $\frac{\log p_x(X)}{\dim}$ and $\frac{\log p_y(Y)}{\dim}$.
+(The square root will make computation easier later on.)\\
+
+\noindent We can represent a fixed distance $d_1$ as the $\DosDist$ between $\N(0, 1)$ and $\N(0, \sigma_{d_1}^2)$ 
+with
+\begin{align}
+	\sigma_{d_1}^2 &= \exp(2 \cdot d_1).
+\end{align}
+
+\noindent An informal proof can be found in Appendix \ref{appendos}.
+
+
+---------
+
+
+
+        diagonal_part = torch.nn.init.normal_(torch.ones(input_size), mean=0.0, std=0.1)
+
+
+        if 'trainable_scaling' in dir(args) and args.trainable_scaling is not None:
+            trainable_scaling = args.trainable_scaling
+        else:
+            trainable_scaling = input_size
+
+        adjust_weights = 'adjust_scaling_weights' in dir(args) and args.adjust_scaling_weights \
+                         and args.scale != None and args.scale > 0
+
+        normal_init_trainable_scale = 'normal_init_trainable_scale' in dir(args) and args.normal_init_trainable_scale
+
+        if adjust_weights:
+            # log as we exponentiate later
+            adjusted_trainable_weight = np.log(1 / args.scale)
+
+        if trainable_scaling > 0:
+            self.trainable_part = nn.Parameter(torch.nn.init.normal_(torch.ones(trainable_scaling), mean=0.0, std=0.1))
+        else:
+            # otherwise Pytorch complains that there is nothing to train
+            self.dummy = nn.Parameter(torch.ones(1))
+
+        if trainable_scaling < input_size:
+            if adjust_weights:
+                # log as we exponentiate later
+                scaling_weight = np.log(1/args.scale)
+            else:
+                scaling_weight = 0
+            #scaling_weights = torch.nn.init.normal_(torch.ones(np.prod(img_shape)), mean=0.0, std=0.1)
+
+        """Adjust Scaling and trainable: 
+        trainable part should start from noise(0)
+        
+        adjust scaling and no trainable
+        everything adjusted
+        
+        trainable (ohne adjust)
+        everything noise(0)
+        
+        """
+
+        if 'trainable_scaling' in dir(args) and args.trainable_scaling is not None:
+            # Make scaling none-trainable
+            self.fixed_part = scaling_weights[args.trainable_scaling:].cuda()
+            if args.trainable_scaling > 0:
+                self.trainable_part = nn.Parameter(scaling_weights[:args.trainable_scaling])
+            else:
+                # otherwise Pytorch complains that there is nothing to train
+                self.dummy = nn.Parameter(torch.ones(1))
+        else:
+            self.trainable_part = nn.Parameter(scaling_weights)
+
+ ----------------
+ 
+ 
+    """share_y_for = ['dos_mani', 'kl_mani', 'llh_mani', 'kl']
+    for x, test in enumerate(tests):
+        #if test not in share_y_for:
+        #    continue
+        for y in range(len(dimensions)):
+            axs[x, y].get_shared_x_axes().join(axs[x, 0], axs[x, y])"""
+			
+			
+----------
+
+        """if len(self.other_classes_loaders) > 0:
+            total_loss = 0
+            for cls, loader in tqdm(self.other_classes_loaders.items()):
+                loss, _ = evaluate_loader(self.model, self.loss_fn, loader, self.args)
+                loss_msg += f'{cls}: {loss:.2f}| '
+                log['loss_' + str(cls)] = loss
+                total_loss += loss
+
+            others_loss = total_loss / len(self.other_classes_loaders)
+            print(f'\t train class: {main_test_cls_loss:.3f} | avg others {others_loss:.3f}')
+
+            log['all_but_main_cls'] = others_loss"""
+
+        """# evaluate with inflation
+        if self.inflater is not None or self.args.ilogits:
+            if self.args.ilogits:
+                # needs to be activated so ilogits does its thing
+                self.model.train()
+
+            main_test_cls_loss, _ = evaluate_loader(self.model, self.loss_fn, self.eval_loader, self.args, self.inflater)
+
+            loss_msg += f'\t inflated main loss: {main_test_cls_loss:.2f} | '
+            log['test_loss_inflated'] = main_test_cls_loss
+
+            if self.args.ilogits:
+                self.model.eval()  # deactivate for security
+        else:
+            main_test_cls_loss, _ = evaluate_loader(self.model, self.loss_fn, self.eval_loader, self.args)
+            loss_msg = f'\t {self.args.training_class}: {main_test_cls_loss:.2f} | '
+            log['test_loss'] = main_test_cls_loss"""
+			
+			
+------------
+
+
+
+#folder = 'inflation-04.04_11-55-40-smooth_step-exp'
+#folder = 'inflation-04.04_16-54-31-line-exp_-samples=1000'
+#folder = 'inflation-05.17_15-11-28-smooth_step-exp_--num_scales=5-batch=32-samples=2000'
+#folder = 'inflation-03.11_16-48-40-sphere-exp_--st_type=fully'
+
+# normal 1K samples
+#folder = 'inflation-04.04_16-54-31-line-exp_'
+#folder = 'inflation-04.04_11-55-40-smooth_step-exp'
+
+# just no rotation
+#folder = 'no_rotation/inflation-03.28_13-53-14-smooth_step-exp_--no_rotation'
+#folder = 'no_rotation/inflation-04.01_09-18-25-line-exp_--no_rotation'
+
+#folder = 'stays_inflation-04.28_13-55-35-smooth_step-exp_--discard_near_0_z=0.0001--mighty_prior-batch=32-samples=1000'
+
+# normal init
+#folder = 'no_rotation/inflation-03.29_06-59-15-smooth_step-exp_normal_init_--trainable_scaling=1--no_rotation'
+#folder = 'special/inflation-03.14_10-50-40-smooth_step-exp_--trainable_scaling=0--adjust_scaling_weights--st_type=fully'
+#folder = 'special/inflation-03.14_10-50-53-smooth_step-exp_--trainable_scaling=1--adjust_scaling_weights--st_type=fully'
+
+
+# no rotation
+# 1 trainable scale
+#folder = 'no_rotation/inflation-03.25_08-24-46-smooth_step-exp_--trainable_scaling=1--no_rotation--st_type=fully--adjust_scaling_weights'
+#folder = 'no_rotation/inflation-03.25_10-19-14-line-exp_--trainable_scaling=1--no_rotation--st_type=fully--adjust_scaling_weights'
+
+# 0 trainable scale
+#folder = 'no_rotation/inflation-03.26_15-31-08-smooth_step-exp_fully_fixed--trainable_scaling=0--no_rotation--adjust_scaling_weights'
+
+
+#folder = 'inflation-08.15_15-27-39-smooth_step-exp_--tangent_noise_var=0.1-batch=32-samples=1000'
+
+
+
+----------
+
+#return -10.8 + 19.43855*x - 11.07751 * x**2 + 2.713738*x**3 - 0.2995921*x**4 + 0.01227564*x**5 + np.sin(x)
+#return -5.175 + 9.032523*x - 4.855696*x**2 + 1.148834*x**3 - 0.1245484*x**4 + 0.005064103*x**5 + np.sin(x)
+#return 1.184192e-13 - 2.938547*x + 5.879021*x**2 - 2.954454*x**3 + 0.5481426*x**4 - 0.034163*x**5 #+ 0.2* np.sin(x)
+#return 6.630807e-14 + 13.95*x - 22.125*x**2 + 11.375*x**3 - 2.375*x**4 + 0.175*x**5
+
+--------------
+
+"""if log_scale <= -6:
+            x_granularity = 0.05
+            y_granularity = 0.0001
+        elif log_scale <= -4:
+            x_granularity = 0.05
+            y_granularity = 0.001
+        elif log_scale <= -2:
+            x_granularity = 0.01
+            y_granularity = 0.01
+        elif log_scale <= -0.5:
+            x_granularity = 0.05
+            y_granularity = 0.02var_to_label
+        elif log_scale <= 0:
+            x_granularity = 0.03
+            y_granularity = 0.05
+        else:
+            x_granularity = 0.05
+            y_granularitplot_data_spacey = 0.02"""
+
+        """if self.dimensions == 2:
+            x_granularity /= 4
+            #y_granularity *= 2
+        if self.fine_grid:
+            x_granularity /= 4"""
+			
+			#x_bigger = y_bigger = np.array([0])
+        #if self.dimensions == 2:
+        """if log_scale is None or log_scale < -1:
+            if self.fine_grid or self.dimensions > 2:
+                y_granularity *= 20
+                x_granularity *= 4
+            else:
+                y_granularity *= 10
+            x_bigger = RotatedData.arange(x_start, x_end, x_granularity)
+            y_bigger = np.concatenate((np.arange(-y_range-1 + y_granularity, -y_range, y_granularity),
+                                       np.arange(y_range + y_granularity, y_range+1, y_granularity)))"""
+
+
+-------
+
+def full_extent(ax, pad=0.0):
+    """Get the full extent of an axes, including axes labels, tick labels, and
+    titles."""
+    # For text objects, we need to draw the figure first, otherwise the extents
+    # are undefined.
+    #ax.figure.canvas.draw()
+    
+    bbox = ax.get_window_extent()
+    bbox = Bbox.from_bounds(bbox.x0, bbox.y0-20, bbox.width+100, bbox.height+25)
+    return bbox
+
+
+y = 1
+for x in range(len(axs[y])):
+    fig = axs[y, x].get_figure()
+    #extent = axs[y,x].get_window_extent().transformed(fig.dpi_scale_trans.inverted())
+    extent = full_extent(axs[y,x]).transformed(fig.dpi_scale_trans.inverted())
+    fig.savefig(f'C:/Mega/trunk/master-thesis/experiments/transformations/dim_2_full_grid/used/sep/Smooth Step/{y}-{x}.png', 
+                bbox_inches=extent)#
+    break
+    #fig.savefig(f'C:/Mega/trunk/master-thesis/experiments/transformations/dim_2_full_grid/used/sep/Smooth Step/{y}-{x}.png', bbox_inches=extent.expanded(1.1, 1.2))

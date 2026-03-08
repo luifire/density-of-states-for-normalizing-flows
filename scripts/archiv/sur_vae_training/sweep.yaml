@@ -1,0 +1,69 @@
+program: ../../src/models/master/training/start_training_master.py
+method: bayes
+metric:
+    name: eval/average_precision
+    goal: maximize
+
+parameters:
+    lr:
+        values: [1e-2, 1e-3, 1e-4, 3e-4, 3e-5, 1e-5]
+    
+    optim:
+        values: ['sgd', 'adam', 'adamax']
+    
+    gamma: # 0.995 is the default parameter from the original code
+        values: [1, 0.995]
+    
+    epochs:
+        min: 20
+        max: 200
+        
+    batch_size:
+        values: [16, 32, 64, 128, 256]
+    
+    # how often we scale down 
+    # as images are of size 28x28, not every scaling is allowed (divides total dimensionality by 4 each scale)
+    num_scales:  
+        min: 1
+        max: 6
+    
+    # how we scale down. none: slicing. max: max pooling
+    pooling:
+        values: ['none', 'max']
+    
+    # amount of coupling layers per scale (after one step, some pooling applies)
+    num_steps:  
+        min: 1
+        max: 10
+      
+    # amount of residual dense blocks per coupling layer
+    densenet_blocks:
+        min: 1
+        max: 10
+        
+    # amount of conv layers per residual block
+    densenet_depth:
+        min: 1
+        max: 15  # 10 was default
+        
+early_terminate:
+    type: hyperband
+    min_iter: 15
+    eta: 3  # so we evaluate [min_iter, min_iter*eta, min_iter*eta*eta, ...]
+
+command:
+  - ${env}
+  - ${interpreter}
+  - ${program}
+  - ${args}
+  - --model=survae 
+  - --dont_check
+  - --warmup=5000
+  - --dequant=flow
+  - --dataset=mnist
+  - --sample_every=5
+  - --eval_every=1
+  - --num_workers=0  
+  - --root=/master-thesis-work/data/
+  #- --root=C:\Mega\trunk\master-thesis\data\
+  - --training_class=0

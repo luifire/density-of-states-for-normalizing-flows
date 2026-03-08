@@ -1,0 +1,64 @@
+docker build -t lui_trainer -f trainer.dockerfile . 
+
+docker container run --gpus '"device=4"' -it -d --name lui_survae_normal lui_trainer
+
+docker container run --gpus '"device=3"' -it -d --name lui_survae lui_trainer
+docker container run --gpus '"device=0"' -it -d --name lui_nf lui_trainer
+docker container run --gpus '"device=2"' -it -d --name lui_iwae lui_trainer
+
+docker container run --gpus '"device=2"' -it -d --name lui_nf_sweep lui_trainer
+docker container run --gpus '"device=3"' -it -d --name lui_survae_bias lui_trainer
+docker container run --gpus '"device=2"' -it -d --name lui_survae_max_pools lui_trainer
+
+docker container run --gpus '"device=4"' -it -d --name lui_unit_tests lui_trainer
+
+
+docker exec -w /master-thesis-work/scripts/sur_vae_training -it lui_survae bash 
+docker exec -w /master-thesis-work/scripts/flow_training -it lui_nf bash 
+
+docker exec -w /master-thesis-work/scripts/sur_vae_training -it lui_survae_8 bash 
+docker exec -w /master-thesis-work/scripts/flow_training -it lui_nf_8 bash 
+
+source activate training
+export PYTHONPATH="${PYTHONPATH}:/master-thesis-work/src/models/:/master-thesis-work/src/common"
+wandb sweep --project sweeps --name nf ###date sweep.yaml
+
+wandb agent luifire/sweeps/3fspznj7
+
+docker login
+luifire
+TuBerlin!2021
+
+
+docker container stop lui_survae lui_nf
+docker container rm lui_survae lui_nf
+
+#### Copy datasets
+docker cp lui_nf:/master-thesis-work/datasets
+
+
+#####
+Copy Checkpoints
+
+mkdir -p CIFAR10
+docker cp trainer_luibrand:/master-thesis-work/scripts/training_flow/CIFAR10 CIFAR10/
+
+docker cp trainer_luibrand:/master-thesis-work/models/survae_flows/experiments/image/log/mnist_8bit/pool_flow/expdecay/nonpool/check checkpoints/
+scp -r dluibrand@192.168.121.10:~/checkpoints/13.04.first_run .
+
+
+#####
+Copy Datasets to dgx (muss beim docker file liegen, weil es von da in den Container muss)
+scp -r datasets/ dluibrand@192.168.121.10:~/master-thesis-work/docker/
+
+########
+Rename old container
+docker image tag lui_trainer:latest lui_trainer_remove:remove
+docker rmi lui_trainer
+
+###
+Stdout und Errout nach Stdout und file.txt 
+2>&1 | tee file.txt
+
+Die ganze Zeit output anzeigen
+tail -f file.txt

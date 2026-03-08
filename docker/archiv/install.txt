@@ -1,0 +1,14 @@
+conda create --name flow_ood -y
+conda activate flow_ood
+
+#conda install ipykernel -y
+#python -m ipykernel install --user --name flow_ood --display-name "Python flow_ood"
+
+
+conda install pytorch torchvision torchaudio cudatoolkit=10.2 -c pytorch -c=conda-forge -y
+conda install -c conda-forge cmocean -y
+scipy, seaborn, sklearn, tqdm
+
+conda install -c intel scikit-learn -y
+conda install -c anaconda requests -y
+conda install -c conda-forge tensorboardx -y

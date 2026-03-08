@@ -1,0 +1,61 @@
+program: ../../src/models/master/training/start_training_master.py
+method: bayes
+metric:
+    name: eval/average_precision
+    goal: maximize
+parameters:
+    lr:
+        values: [1e-2, 1e-3, 1e-4, 3e-4, 3e-5, 1e-5]
+        
+    weight_decay:
+        min: -10
+        max: 0
+        distribution: log_uniform
+    
+    epochs:
+        min: 20
+        max: 200
+        
+    batch_size:
+        values: [16, 32, 64, 128, 256]
+    
+    # how often we sample z
+    num_k:
+        min: 0
+        max: 5 # e^5 = 148
+        distribution: q_log_uniform
+    
+    latent_dim:
+        min: 1
+        max: 100
+        
+    # beta for kld weight
+    kld_weight:
+        values: [1, 0.1, 0.01, 0.001, 0.0001]
+        
+    # how many layers the iwae can use
+    depth:
+        values: [3, 4, 5, 6]
+    
+early_terminate:
+    type: hyperband
+    min_iter: 2 # note that one step is an "eval" step. 
+    # However, opposed to other models, this eval step needs to reevaluate an epoch and thus first possible 
+    # early_termination is after 20 Epochs
+    eta: 3  # so we evaluate [min_iter, min_iter*eta, min_iter*eta*eta, ...]
+
+command:
+  - ${env}
+  - ${interpreter}
+  - ${program}
+  - ${args}
+  - --model=iwae 
+  #- --no_bias
+  - --dont_check
+  - --dataset=mnist
+  - --sample_every=5
+  - --eval_every=10
+  - --num_workers=0
+  - --root=/master-thesis-work/data/
+  #- --root=C:\Mega\trunk\master-thesis\data\
+  - --training_class=0

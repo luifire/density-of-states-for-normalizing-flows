@@ -1,0 +1,23 @@
+conda create -n iwae python=3.9
+
+conda install -c conda-forge pytorch-lightning=0.7.6 -y
+conda install -c anaconda pyyaml -y
+conda install -c conda-forge tensorboardx -y
+conda install -c conda-forge tensorboard -y
+conda install terminado -y
+conda install -c conda-forge torch -y
+#conda install test-tube -y
+pip install test-tube
+conda install -c pytorch torchvision -y
+
+test-tube
+torch
+torchfile
+torchnet
+torchsummary
+torchvision
+
+
+
+-----------
+

@@ -1,0 +1,38 @@
+qlogin  # to get into any node
+
+# install your stuff
+#conda create --name train python=3.8
+
+#virtualenv --system-site-packages -p python3 train
+#source ~/train/bin/activate
+
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+mkdir /root/.conda
+bash Miniconda3-latest-Linux-x86_64.sh -b
+rm -f Miniconda3-latest-Linux-x86_64.sh 
+
+
+
+
+git clone https://luifire:u4LvxhULKsZHukA3y7x2@git.tu-berlin.de/luifire/master-thesis-work.git 
+
+conda env create -f master-thesis-work/docker/env.yml --name training python=3.8
+
+wandb login 4e99e3173e568d668a69f248cb3d8d963eadfd02
+
+
+###scp -r cluster-ml:~/master_data/checkpoints/* .
+
+
+rm inflation.zip
+zip -r inflation.zip master_data/checkpoints/ -i *.pt *.pickle *model_parameterargs
+
+
+scp cluster-ml:~/inflation.zip Downloads/
+rm -r Downloads/inflation
+unzip Downloads/inflation.zip -d Downloads/inflation/
+
+
+#cleanup
+rm -r master_data/checkpoints/
+rm inflation.zip

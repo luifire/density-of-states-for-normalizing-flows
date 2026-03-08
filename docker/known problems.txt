@@ -1,0 +1,1 @@
+- MNIST Files need to be in this directory!
