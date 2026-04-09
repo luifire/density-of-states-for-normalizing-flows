@@ -1,5 +1,5 @@
 This project contains my master thesis.<br>
-Please see thesis.pdf <br><br>
+See [thesis.pdf](https://github.com/luifire/density-of-states-for-normalizing-flows/blob/main/thesis.pdf) <br><br>
 
 #Abstract:<br>
 Normalizing flows are a promising candidate to model complex high-dimensional densities. They can be categorized into volume-preserving (VP) and non-volume preserving (NVP). We investigate in which scenarios one or the other should be preferred.<br><br>
